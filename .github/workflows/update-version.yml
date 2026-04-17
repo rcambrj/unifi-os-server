@@ -2,7 +2,7 @@ name: Update UniFi OS Server Version
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -16,56 +16,89 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for new version
-        id: check
-        run: |
-          curl -s https://download.svc.ui.com/v1/downloads/products/slugs/unifi-os-server > /tmp/api.json
-          NEW_VERSION=$(jq -r '.versions | map(select(.arch == "x64")) | max_by(.created_at) | .version' /tmp/api.json)
-          NEW_BUILD=$(jq -r '.versions | map(select(.arch == "x64")) | max_by(.created_at) | .build' /tmp/api.json)
-          NEW_URL=$(jq -r '.versions | map(select(.arch == "x64")) | max_by(.created_at) | .downloads[0].url' /tmp/api.json)
-          
-          CURRENT_VERSION=$(jq -r '.version' packages/unifi-os-server-image/x64.nix | cut -d'"' -f2)
-          
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "new_build=$NEW_BUILD" >> $GITHUB_OUTPUT
-          echo "new_url=$NEW_URL" >> $GITHUB_OUTPUT
-          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          
-          if [ "$NEW_VERSION" = "$CURRENT_VERSION" ]; then
-            echo "No new version available"
-            echo "has_update=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_update=true" >> $GITHUB_OUTPUT
-          fi
+      - uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Compute SHA256
-        if: steps.check.outputs.has_update == 'true'
-        id: hash
+      - name: Fetch latest Linux installers
+        id: latest
         run: |
-          wget -q "${{ steps.check.outputs.new_url }}" -O /tmp/installer
-          HASH=$(sha256sum /tmp/installer | cut -d' ' -f1)
-          NIX_HASH="sha256-$(echo -n "$HASH" | xxd -r -p | base64 | tr -d '\n')"
-          echo "hash=$NIX_HASH" >> $GITHUB_OUTPUT
+          curl -fsSL https://download.svc.ui.com/v1/downloads/products/slugs/unifi-os-server -o api.json
 
-      - name: Update x64.nix
-        if: steps.check.outputs.has_update == 'true'
+          x64=$(jq -r '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(x64\\)$"))] | max_by(.date_published)' api.json)
+          arm64=$(jq -r '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(arm64\\)$"))] | max_by(.date_published)' api.json)
+
+          x64_version=$(jq -r '.version' <<<"$x64")
+          x64_url=$(jq -r '.file_url' <<<"$x64")
+          arm64_version=$(jq -r '.version' <<<"$arm64")
+          arm64_url=$(jq -r '.file_url' <<<"$arm64")
+
+          echo "x64_version=$x64_version" >> "$GITHUB_OUTPUT"
+          echo "x64_url=$x64_url" >> "$GITHUB_OUTPUT"
+          echo "arm64_version=$arm64_version" >> "$GITHUB_OUTPUT"
+          echo "arm64_url=$arm64_url" >> "$GITHUB_OUTPUT"
+
+      - name: Compute hashes and extract image versions
+        id: metadata
+        run: |
+          nix shell nixpkgs#binwalk nixpkgs#gnutar nixpkgs#jq nixpkgs#findutils nixpkgs#coreutils -c bash -euo pipefail <<'EOF'
+          fetch_metadata() {
+            local arch="$1"
+            local url="$2"
+            local version="$3"
+            local work="$(mktemp -d)"
+
+            mkdir -p "$work/extracted"
+
+            curl -fsSL "$url" -o "$work/installer"
+            local sha256
+            sha256="$(nix hash file --type sha256 --base64 "$work/installer")"
+
+            chmod u+w "$work/installer"
+            ( cd "$work" && binwalk -e ./installer >/dev/null )
+
+            local image_tar
+            image_tar="$(find "$work" -type f -name image.tar | head -n1)"
+            tar -xf "$image_tar" -C "$work/extracted"
+
+            local image_version
+            image_version="$(jq -r '.[0].RepoTags[0]' "$work/extracted/manifest.json" | cut -d: -f2)"
+
+            printf '%s_sha256=sha256-%s\n' "$arch" "$sha256" >> "$GITHUB_OUTPUT"
+            printf '%s_image_version=%s\n' "$arch" "$image_version" >> "$GITHUB_OUTPUT"
+            printf '%s_installer_version=%s\n' "$arch" "$version" >> "$GITHUB_OUTPUT"
+          }
+
+          fetch_metadata x64 "${{ steps.latest.outputs.x64_url }}" "${{ steps.latest.outputs.x64_version }}"
+          fetch_metadata arm64 "${{ steps.latest.outputs.arm64_url }}" "${{ steps.latest.outputs.arm64_version }}"
+          EOF
+
+      - name: Update package data
         run: |
           cat > packages/unifi-os-server-image/x64.nix <<EOF
-          { callPackage, lib }:
+          {
+            imageVersion = "${{ steps.metadata.outputs.x64_image_version }}";
+            installerVersion = "${{ steps.metadata.outputs.x64_installer_version }}";
+            url = "${{ steps.latest.outputs.x64_url }}";
+            sha256 = "${{ steps.metadata.outputs.x64_sha256 }}";
+          }
+          EOF
 
-          callPackage ./default.nix {
-            arch = "x64";
-            url = "${{ steps.check.outputs.new_url }}";
-            hash = "${{ steps.hash.outputs.hash }}";
-            version = "${{ steps.check.outputs.new_version }}";
+          cat > packages/unifi-os-server-image/arm64.nix <<EOF
+          {
+            imageVersion = "${{ steps.metadata.outputs.arm64_image_version }}";
+            installerVersion = "${{ steps.metadata.outputs.arm64_installer_version }}";
+            url = "${{ steps.latest.outputs.arm64_url }}";
+            sha256 = "${{ steps.metadata.outputs.arm64_sha256 }}";
           }
           EOF
 
       - name: Commit and push
-        if: steps.check.outputs.has_update == 'true'
         run: |
+          if git diff --quiet -- packages/unifi-os-server-image/x64.nix packages/unifi-os-server-image/arm64.nix; then
+            exit 0
+          fi
+
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add packages/unifi-os-server-image/x64.nix
-          git commit -m "chore: update to UniFi OS Server ${{ steps.check.outputs.new_version }}"
+          git add packages/unifi-os-server-image/x64.nix packages/unifi-os-server-image/arm64.nix
+          git commit -m "chore: update UniFi OS Server installers"
           git push

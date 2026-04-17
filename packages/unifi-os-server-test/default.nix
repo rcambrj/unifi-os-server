@@ -1,6 +1,6 @@
-{ inputs
+{ flake
+, perSystem
 , pkgs
-, unifiOsServerPackage
 }:
 
 pkgs.testers.runNixOSTest {
@@ -8,7 +8,7 @@ pkgs.testers.runNixOSTest {
 
   nodes.machine = { ... }: {
     imports = [
-      inputs.self.nixosModules.unifi-os-server
+      flake.nixosModules.unifi-os-server
     ];
 
     virtualisation = {
@@ -18,8 +18,9 @@ pkgs.testers.runNixOSTest {
 
     services.unifi-os-server = {
       enable = true;
-      package = unifiOsServerPackage;
+      package = perSystem.self.unifi-os-server-image;
       openFirewall = true;
+      nginx.enable = false;
     };
   };
 
@@ -27,6 +28,6 @@ pkgs.testers.runNixOSTest {
     start_all()
     machine.wait_for_unit("podman-unifi-os-server.service")
 
-    machine.wait_until_succeeds("curl -k -f https://localhost:443 >/dev/null 2>&1", timeout=300)
+    machine.wait_until_succeeds("curl -k -f https://localhost:11443 >/dev/null 2>&1", timeout=300)
   '';
 }
