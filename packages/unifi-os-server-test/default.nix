@@ -28,6 +28,9 @@ pkgs.testers.runNixOSTest {
     start_all()
     machine.wait_for_unit("podman-unifi-os-server.service")
 
-    machine.wait_until_succeeds("curl -k -f https://localhost:11443 >/dev/null 2>&1", timeout=300)
+    machine.wait_until_succeeds(
+        "body=$(curl -ksf https://localhost:11443) && printf '%s' \"$body\" | grep -F 'window.UNIFI_OS_MANIFEST' >/dev/null && printf '%s' \"$body\" | grep -F 'UniFi OS Server' >/dev/null",
+        timeout=300,
+    )
   '';
 }
