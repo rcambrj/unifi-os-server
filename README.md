@@ -68,8 +68,8 @@ Run UniFi OS Server on NixOS with Podman.
 ## Packages
 
 - `.#unifi-os-server-image`: system-selected image package
-- `.#unifi-os-server-image-x64`: x86_64 image package
-- `.#unifi-os-server-image-arm64`: arm64 image package
+- `.#unifi-os-server-image-x86_64`: x86_64 image package
+- `.#unifi-os-server-image-aarch64`: aarch64 image package
 - `.#unifi-os-server-test`: packaged NixOS VM test
 
 ## Test

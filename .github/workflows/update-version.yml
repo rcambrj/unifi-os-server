@@ -23,18 +23,18 @@ jobs:
         run: |
           curl -fsSL https://download.svc.ui.com/v1/downloads/products/slugs/unifi-os-server -o api.json
 
-          x64=$(jq -r '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(x64\\)$"))] | max_by(.date_published)' api.json)
-          arm64=$(jq -r '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(arm64\\)$"))] | max_by(.date_published)' api.json)
+          x86_64=$(jq -r '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(x64\\)$"))] | max_by(.date_published)' api.json)
+          aarch64=$(jq -r '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(arm64\\)$"))] | max_by(.date_published)' api.json)
 
-          x64_version=$(jq -r '.version' <<<"$x64")
-          x64_url=$(jq -r '.file_url' <<<"$x64")
-          arm64_version=$(jq -r '.version' <<<"$arm64")
-          arm64_url=$(jq -r '.file_url' <<<"$arm64")
+          x86_64_version=$(jq -r '.version' <<<"$x86_64")
+          x86_64_url=$(jq -r '.file_url' <<<"$x86_64")
+          aarch64_version=$(jq -r '.version' <<<"$aarch64")
+          aarch64_url=$(jq -r '.file_url' <<<"$aarch64")
 
-          echo "x64_version=$x64_version" >> "$GITHUB_OUTPUT"
-          echo "x64_url=$x64_url" >> "$GITHUB_OUTPUT"
-          echo "arm64_version=$arm64_version" >> "$GITHUB_OUTPUT"
-          echo "arm64_url=$arm64_url" >> "$GITHUB_OUTPUT"
+          echo "x86_64_version=$x86_64_version" >> "$GITHUB_OUTPUT"
+          echo "x86_64_url=$x86_64_url" >> "$GITHUB_OUTPUT"
+          echo "aarch64_version=$aarch64_version" >> "$GITHUB_OUTPUT"
+          echo "aarch64_url=$aarch64_url" >> "$GITHUB_OUTPUT"
 
       - name: Compute hashes and extract image versions
         id: metadata
@@ -67,38 +67,38 @@ jobs:
             printf '%s_installer_version=%s\n' "$arch" "$version" >> "$GITHUB_OUTPUT"
           }
 
-          fetch_metadata x64 "${{ steps.latest.outputs.x64_url }}" "${{ steps.latest.outputs.x64_version }}"
-          fetch_metadata arm64 "${{ steps.latest.outputs.arm64_url }}" "${{ steps.latest.outputs.arm64_version }}"
+          fetch_metadata x86_64 "${{ steps.latest.outputs.x86_64_url }}" "${{ steps.latest.outputs.x86_64_version }}"
+          fetch_metadata aarch64 "${{ steps.latest.outputs.aarch64_url }}" "${{ steps.latest.outputs.aarch64_version }}"
           EOF
 
       - name: Update package data
         run: |
-          cat > packages/unifi-os-server-image/x64.nix <<EOF
+          cat > packages/unifi-os-server-image/x86_64.nix <<EOF
           {
-            imageVersion = "${{ steps.metadata.outputs.x64_image_version }}";
-            installerVersion = "${{ steps.metadata.outputs.x64_installer_version }}";
-            url = "${{ steps.latest.outputs.x64_url }}";
-            sha256 = "${{ steps.metadata.outputs.x64_sha256 }}";
+            imageVersion = "${{ steps.metadata.outputs.x86_64_image_version }}";
+            installerVersion = "${{ steps.metadata.outputs.x86_64_installer_version }}";
+            url = "${{ steps.latest.outputs.x86_64_url }}";
+            sha256 = "${{ steps.metadata.outputs.x86_64_sha256 }}";
           }
           EOF
 
-          cat > packages/unifi-os-server-image/arm64.nix <<EOF
+          cat > packages/unifi-os-server-image/aarch64.nix <<EOF
           {
-            imageVersion = "${{ steps.metadata.outputs.arm64_image_version }}";
-            installerVersion = "${{ steps.metadata.outputs.arm64_installer_version }}";
-            url = "${{ steps.latest.outputs.arm64_url }}";
-            sha256 = "${{ steps.metadata.outputs.arm64_sha256 }}";
+            imageVersion = "${{ steps.metadata.outputs.aarch64_image_version }}";
+            installerVersion = "${{ steps.metadata.outputs.aarch64_installer_version }}";
+            url = "${{ steps.latest.outputs.aarch64_url }}";
+            sha256 = "${{ steps.metadata.outputs.aarch64_sha256 }}";
           }
           EOF
 
       - name: Commit and push
         run: |
-          if git diff --quiet -- packages/unifi-os-server-image/x64.nix packages/unifi-os-server-image/arm64.nix; then
+          if git diff --quiet -- packages/unifi-os-server-image/x86_64.nix packages/unifi-os-server-image/aarch64.nix; then
             exit 0
           fi
 
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add packages/unifi-os-server-image/x64.nix packages/unifi-os-server-image/arm64.nix
+          git add packages/unifi-os-server-image/x86_64.nix packages/unifi-os-server-image/aarch64.nix
           git commit -m "chore: update UniFi OS Server installers"
           git push

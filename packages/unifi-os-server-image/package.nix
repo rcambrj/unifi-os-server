@@ -2,8 +2,8 @@
 , pkgs
 , system ? pkgs.stdenv.hostPlatform.system
 , packageData ?
-    if system == "x86_64-linux" then import ./x64.nix
-    else if builtins.elem system [ "aarch64-linux" "aarch64-darwin" ] then import ./arm64.nix
+    if system == "x86_64-linux" then import ./x86_64.nix
+    else if builtins.elem system [ "aarch64-linux" "aarch64-darwin" ] then import ./aarch64.nix
     else throw "unsupported system for unifi-os-server-image: ${system}"
 , imageVersion ? packageData.imageVersion
 , installerVersion ? packageData.installerVersion
