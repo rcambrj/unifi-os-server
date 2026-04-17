@@ -1,0 +1,71 @@
+name: Update UniFi OS Server Version
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for new version
+        id: check
+        run: |
+          curl -s https://download.svc.ui.com/v1/downloads/products/slugs/unifi-os-server > /tmp/api.json
+          NEW_VERSION=$(jq -r '.versions | map(select(.arch == "x64")) | max_by(.created_at) | .version' /tmp/api.json)
+          NEW_BUILD=$(jq -r '.versions | map(select(.arch == "x64")) | max_by(.created_at) | .build' /tmp/api.json)
+          NEW_URL=$(jq -r '.versions | map(select(.arch == "x64")) | max_by(.created_at) | .downloads[0].url' /tmp/api.json)
+          
+          CURRENT_VERSION=$(jq -r '.version' packages/unifi-os-server-image/x64.nix | cut -d'"' -f2)
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_build=$NEW_BUILD" >> $GITHUB_OUTPUT
+          echo "new_url=$NEW_URL" >> $GITHUB_OUTPUT
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          if [ "$NEW_VERSION" = "$CURRENT_VERSION" ]; then
+            echo "No new version available"
+            echo "has_update=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_update=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compute SHA256
+        if: steps.check.outputs.has_update == 'true'
+        id: hash
+        run: |
+          wget -q "${{ steps.check.outputs.new_url }}" -O /tmp/installer
+          HASH=$(sha256sum /tmp/installer | cut -d' ' -f1)
+          NIX_HASH="sha256-$(echo -n "$HASH" | xxd -r -p | base64 | tr -d '\n')"
+          echo "hash=$NIX_HASH" >> $GITHUB_OUTPUT
+
+      - name: Update x64.nix
+        if: steps.check.outputs.has_update == 'true'
+        run: |
+          cat > packages/unifi-os-server-image/x64.nix <<EOF
+          { callPackage, lib }:
+
+          callPackage ./default.nix {
+            arch = "x64";
+            url = "${{ steps.check.outputs.new_url }}";
+            hash = "${{ steps.hash.outputs.hash }}";
+            version = "${{ steps.check.outputs.new_version }}";
+          }
+          EOF
+
+      - name: Commit and push
+        if: steps.check.outputs.has_update == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add packages/unifi-os-server-image/x64.nix
+          git commit -m "chore: update to UniFi OS Server ${{ steps.check.outputs.new_version }}"
+          git push
