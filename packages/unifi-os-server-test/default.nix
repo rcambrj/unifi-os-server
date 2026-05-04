@@ -29,7 +29,7 @@ pkgs.testers.runNixOSTest {
 
     machine.wait_until_succeeds(
         "body=$(curl -ksf https://localhost:11443) && printf '%s' \"$body\" | grep -F 'window.UNIFI_OS_MANIFEST' >/dev/null && printf '%s' \"$body\" | grep -F 'UniFi OS Server' >/dev/null",
-        timeout=300,
+        timeout=120,
     )
   '';
 }
