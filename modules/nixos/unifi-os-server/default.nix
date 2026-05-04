@@ -1,3 +1,4 @@
+{ flake, ... }:
 { config
 , lib
 , pkgs
@@ -93,6 +94,7 @@ in
 
     package = mkOption {
       type = types.package;
+      default = flake.packages.${pkgs.system}.unifi-os-server-image;
       description = "Package containing the extracted UniFi OS Server OCI archive.";
     };
 

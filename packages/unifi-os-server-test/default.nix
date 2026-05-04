@@ -18,7 +18,6 @@ pkgs.testers.runNixOSTest {
 
     services.unifi-os-server = {
       enable = true;
-      package = perSystem.self.unifi-os-server-image;
       openFirewall = true;
       nginx.enable = false;
     };
