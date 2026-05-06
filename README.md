@@ -2,8 +2,10 @@
 
 Run UniFi OS Server on NixOS with Podman.
 
-> [!CAUTION]
-> current state: almost certainly broken
+* Updates weekly
+* Binary cache courtesy of [garnix.io](https://garnix.io/)
+
+> Current state: experimental
 
 ## Usage
 
@@ -12,8 +14,15 @@ Run UniFi OS Server on NixOS with Podman.
   inputs.unifi-os-server.url = "github:rcambrj/nix-unifi-os-server";
 
   outputs = { nixpkgs, unifi-os-server, ... }: {
-    nixosConfigurations.host = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux"; # or aarch64-linux
+    nixosConfigurations.host = let
+      system = "x86_64-linux"; # or aarch64-linux, x86_64-darwin, aarch64-darwin
+    in nixpkgs.lib.nixosSystem {
+      inherit system;
+
+      # install the package (darwin)
+      environment.systemPackages = unifi-os-server.packages.${system}.unifi-os-server;
+
+      # or configure the service (linux)
       modules = [
         unifi-os-server.nixosModules.unifi-os-server
         {
