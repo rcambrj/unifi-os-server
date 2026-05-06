@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  update-version:
+  update-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,5 +18,65 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Update version
-        run: ./scripts/update-version.sh --push
+      - name: Update Linux versions
+        run: ./scripts/update-version.sh --os=linux
+
+      - name: Prepare Linux package data artifact
+        run: |
+          mkdir -p artifact/packages/unifi-os-server
+          cp packages/unifi-os-server/*-linux.nix artifact/packages/unifi-os-server/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-package-data
+          path: artifact
+
+  update-darwin:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Update Darwin versions
+        run: ./scripts/update-version.sh --os=darwin
+
+      - name: Prepare Darwin package data artifact
+        run: |
+          mkdir -p artifact/packages/unifi-os-server
+          cp packages/unifi-os-server/*-darwin.nix artifact/packages/unifi-os-server/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-package-data
+          path: artifact
+
+  commit:
+    runs-on: ubuntu-slim
+    needs:
+      - update-linux
+      - update-darwin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: .
+          merge-multiple: true
+
+      - name: Commit and push
+        run: |
+          if git diff --quiet -- packages/unifi-os-server/*.nix; then
+            echo No changes detected, nothing to commit
+            exit 0
+          fi
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add packages/unifi-os-server/*.nix
+          git commit -m "chore: update UniFi OS Server installers"
+          git push

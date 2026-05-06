@@ -1,42 +1,48 @@
-{ flake
-, perSystem
-, pkgs
+{
+  flake,
+  perSystem,
+  pkgs,
 }:
 
 pkgs.testers.runNixOSTest {
   name = "unifi-os-server-test";
 
   nodes = {
-    machine = { ... }: {
-      imports = [
-        flake.nixosModules.unifi-os-server
-      ];
+    machine =
+      { ... }:
+      {
+        imports = [
+          flake.nixosModules.unifi-os-server
+        ];
 
-      virtualisation = {
-        diskSize = 16384;
-        memorySize = 4096;
-      };
+        virtualisation = {
+          diskSize = 16384;
+          memorySize = 4096;
+        };
 
-      services.unifi-os-server = {
-        enable = true;
-        openFirewall = true;
-        nginx.enable = false;
+        services.unifi-os-server = {
+          enable = true;
+          openFirewall = true;
+          nginx.enable = false;
+        };
       };
-    };
 
     nginxMachine =
       { ... }:
       let
-        cert = pkgs.runCommand "unifi-test-cert" {
-          nativeBuildInputs = [ pkgs.openssl ];
-        } ''
-          mkdir -p "$out"
-          openssl req -x509 -newkey rsa:2048 -sha256 -nodes \
-            -subj '/CN=unifi.test' \
-            -days 3650 \
-            -keyout "$out/key.pem" \
-            -out "$out/cert.pem"
-        '';
+        cert =
+          pkgs.runCommand "unifi-test-cert"
+            {
+              nativeBuildInputs = [ pkgs.openssl ];
+            }
+            ''
+              mkdir -p "$out"
+              openssl req -x509 -newkey rsa:2048 -sha256 -nodes \
+                -subj '/CN=unifi.test' \
+                -days 3650 \
+                -keyout "$out/key.pem" \
+                -out "$out/cert.pem"
+            '';
       in
       {
         imports = [

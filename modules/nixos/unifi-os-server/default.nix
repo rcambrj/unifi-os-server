@@ -1,8 +1,9 @@
 { flake, ... }:
-{ config
-, lib
-, pkgs
-, ...
+{
+  config,
+  lib,
+  pkgs,
+  ...
 }:
 let
   inherit (lib)
@@ -38,7 +39,8 @@ let
 
   mkStateRule = subdir: "d ${cfg.stateDir}/${subdir} 0755 root root -";
 
-  parseFirewallPort = value:
+  parseFirewallPort =
+    value:
     let
       parts = splitString "/" value;
     in
@@ -49,14 +51,21 @@ let
 
   parsedFirewallPorts = map parseFirewallPort cfg.firewallPorts;
 
-  tcpFirewallPorts = map (entry: entry.port) (builtins.filter (entry: entry.protocol == "tcp") parsedFirewallPorts);
-  udpFirewallPorts = map (entry: entry.port) (builtins.filter (entry: entry.protocol == "udp") parsedFirewallPorts);
+  tcpFirewallPorts = map (entry: entry.port) (
+    builtins.filter (entry: entry.protocol == "tcp") parsedFirewallPorts
+  );
+  udpFirewallPorts = map (entry: entry.port) (
+    builtins.filter (entry: entry.protocol == "udp") parsedFirewallPorts
+  );
 
-  uiMapping = findFirst (value: builtins.match "([0-9]+):443(/tcp)?" value != null) null cfg.portMappings;
+  uiMapping = findFirst (
+    value: builtins.match "([0-9]+):443(/tcp)?" value != null
+  ) null cfg.portMappings;
   uiPort =
-    if uiMapping == null
-    then null
-    else builtins.fromJSON (head (builtins.match "([0-9]+):443(/tcp)?" uiMapping));
+    if uiMapping == null then
+      null
+    else
+      builtins.fromJSON (head (builtins.match "([0-9]+):443(/tcp)?" uiMapping));
 
   ucoreDebug = pkgs.writeText "unifi-core-debug.conf" ''
     [Service]
@@ -84,7 +93,8 @@ let
     "${cfg.stateDir}/mongodb:/var/lib/mongodb"
     "${ucorePreStartFix}:/etc/systemd/system/unifi-core.service.d/prestart-fix.conf:ro"
     "${mongoPreStartFix}:/etc/systemd/system/mongodb.service.d/prestart-fix.conf:ro"
-  ] ++ optional cfg.debugLogging "${ucoreDebug}:/etc/systemd/system/unifi-core.service.d/debug.conf:ro";
+  ]
+  ++ optional cfg.debugLogging "${ucoreDebug}:/etc/systemd/system/unifi-core.service.d/debug.conf:ro";
 
   nginxUpstream = "https://127.0.0.1:${toString uiPort}";
 in
@@ -94,7 +104,7 @@ in
 
     package = mkOption {
       type = types.package;
-      default = flake.packages.${pkgs.system}.unifi-os-server-image;
+      default = flake.packages.${pkgs.system}.unifi-os-server;
       description = "Package containing the extracted UniFi OS Server OCI archive.";
     };
 
@@ -216,7 +226,8 @@ in
 
     systemd.tmpfiles.rules = [
       "d ${cfg.stateDir} 0755 root root -"
-    ] ++ map mkStateRule stateSubdirs;
+    ]
+    ++ map mkStateRule stateSubdirs;
 
     systemd.services.podman-unifi-os-server = {
       restartTriggers = [ cfg.package ];
@@ -240,14 +251,16 @@ in
         UOS_SYSTEM_IP = "127.0.0.1";
         UOS_SERVER_VERSION = cfg.package.version;
         FIRMWARE_PLATFORM = if pkgs.stdenv.hostPlatform.isAarch64 then "linux-arm64" else "linux-x64";
-      } // cfg.environment;
+      }
+      // cfg.environment;
 
       volumes = requiredVolumeMounts ++ cfg.extraVolumes;
 
       extraOptions = [
         "--systemd=always"
         "--add-host=host.docker.internal:host-gateway"
-      ] ++ cfg.extraOptions;
+      ]
+      ++ cfg.extraOptions;
     };
   };
 }

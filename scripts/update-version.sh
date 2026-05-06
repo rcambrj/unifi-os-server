@@ -1,48 +1,111 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PUSH=false
+OS=""
+
+usage() {
+  echo "Usage: $0 --os=linux|darwin" >&2
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --push) PUSH=true; shift ;;
-    *) echo "Usage: $0 [--push]" >&2; exit 1 ;;
+    --os=linux) OS="linux"; shift ;;
+    --os=darwin) OS="darwin"; shift ;;
+    --os)
+      if [[ $# -lt 2 ]]; then
+        usage
+        exit 1
+      fi
+      OS="$2"
+      shift 2
+      ;;
+    *) usage; exit 1 ;;
   esac
 done
 
+if [[ "$OS" != "linux" && "$OS" != "darwin" ]]; then
+  usage
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DATA_DIR="$REPO_ROOT/packages/unifi-os-server"
 
-DATA_DIR="$REPO_ROOT/packages/unifi-os-server-image"
+select_download() {
+  local pattern="$1"
+  jq -c --arg pattern "$pattern" '[.downloads[] | select(.name | test($pattern))] | max_by(.date_published) // empty' <<<"$API_JSON"
+}
 
-echo "==> Fetching latest UniFi OS Server installers..."
+read_download_field() {
+  local json="$1"
+  local field="$2"
+  jq -r ".$field" <<<"$json"
+}
+
+write_linux_data() {
+  local system="$1"
+  local image_version="$2"
+  local installer_version="$3"
+  local url="$4"
+  local sha256="$5"
+
+  cat > "$DATA_DIR/$system.nix" <<EOF
+{
+  imageVersion = "$image_version";
+  installerVersion = "$installer_version";
+  url = "$url";
+  sha256 = "$sha256";
+}
+EOF
+}
+
+write_darwin_data() {
+  local system="$1"
+  local installer_version="$2"
+  local url="$3"
+  local sha256="$4"
+
+  cat > "$DATA_DIR/$system.nix" <<EOF
+{
+  installerVersion = "$installer_version";
+  url = "$url";
+  sha256 = "$sha256";
+}
+EOF
+}
+
+echo "==> Fetching latest UniFi OS Server $OS installers..."
 
 API_JSON="$(curl -fsSL https://download.svc.ui.com/v1/downloads/products/slugs/unifi-os-server)"
 
-x86_64_json="$(jq -c '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(x64\\)$"))] | max_by(.date_published)' <<<"$API_JSON")"
-aarch64_json="$(jq -c '[.downloads[] | select(.name | test("UniFi OS Server .* for Linux \\(arm64\\)$"))] | max_by(.date_published)' <<<"$API_JSON")"
+if [[ "$OS" == "linux" ]]; then
+  x86_64_linux_json="$(select_download 'UniFi OS Server .* for Linux \(x64\)$')"
+  aarch64_linux_json="$(select_download 'UniFi OS Server .* for Linux \(arm64\)$')"
 
-x86_64_version="$(jq -r '.version' <<<"$x86_64_json")"
-x86_64_url="$(jq -r '.file_url' <<<"$x86_64_json")"
-aarch64_version="$(jq -r '.version' <<<"$aarch64_json")"
-aarch64_url="$(jq -r '.file_url' <<<"$aarch64_json")"
+  x86_64_linux_version="$(read_download_field "$x86_64_linux_json" version)"
+  x86_64_linux_url="$(read_download_field "$x86_64_linux_json" file_url)"
+  aarch64_linux_version="$(read_download_field "$aarch64_linux_json" version)"
+  aarch64_linux_url="$(read_download_field "$aarch64_linux_json" file_url)"
 
-echo "  x86_64: ${x86_64_version} (${x86_64_url})"
-echo "  aarch64: ${aarch64_version} (${aarch64_url})"
+  echo "  x86_64-linux: ${x86_64_linux_version} (${x86_64_linux_url})"
+  echo "  aarch64-linux: ${aarch64_linux_version} (${aarch64_linux_url})"
+  echo "==> Computing hashes and extracting image versions..."
 
-echo "==> Computing hashes and extracting image versions..."
+  metadata_file="$(mktemp)"
+  trap 'rm -f "$metadata_file"' EXIT
 
-metadata_file="$(mktemp)"
-
-X86_64_URL="$x86_64_url" \
-X86_64_VERSION="$x86_64_version" \
-AARCH64_URL="$aarch64_url" \
-AARCH64_VERSION="$aarch64_version" \
-METADATA_FILE="$metadata_file" \
-  nix shell nixpkgs#binwalk nixpkgs#gnutar nixpkgs#jq nixpkgs#findutils nixpkgs#coreutils -c bash -euo pipefail <<'EOF'
-fetch_metadata() {
-  local arch="$1"
-  local url="$2"
-  local version="$3"
+  X86_64_LINUX_URL="$x86_64_linux_url" \
+  X86_64_LINUX_VERSION="$x86_64_linux_version" \
+  AARCH64_LINUX_URL="$aarch64_linux_url" \
+  AARCH64_LINUX_VERSION="$aarch64_linux_version" \
+  METADATA_FILE="$metadata_file" \
+    nix shell nixpkgs#binwalk nixpkgs#gnutar nixpkgs#jq nixpkgs#findutils nixpkgs#coreutils -c bash -euo pipefail <<'EOF'
+fetch_linux_metadata() {
+  local system="$1"
+  local var_prefix="$2"
+  local url="$3"
+  local version="$4"
 
   local work
   work="$(mktemp -d)"
@@ -58,68 +121,86 @@ fetch_metadata() {
 
   local image_tar
   image_tar="$(find "$work" -type f -name image.tar | head -n1)"
+  if [ -z "$image_tar" ]; then
+    echo "Could not find embedded image.tar in $system installer" >&2
+    exit 1
+  fi
+
   tar -xf "$image_tar" -C "$work/extracted"
 
   local image_version
   image_version="$(jq -r '.[0].RepoTags[0]' "$work/extracted/manifest.json" | cut -d: -f2)"
 
-  printf '%s_sha256=sha256-%s\n' "$arch" "$sha256" >> "$METADATA_FILE"
-  printf '%s_image_version=%s\n' "$arch" "$image_version" >> "$METADATA_FILE"
-  printf '%s_installer_version=%s\n' "$arch" "$version" >> "$METADATA_FILE"
+  printf '%s_sha256=sha256-%s\n' "$var_prefix" "$sha256" >> "$METADATA_FILE"
+  printf '%s_image_version=%s\n' "$var_prefix" "$image_version" >> "$METADATA_FILE"
+  printf '%s_installer_version=%s\n' "$var_prefix" "$version" >> "$METADATA_FILE"
 
   rm -rf "$work"
 }
 
-fetch_metadata x86_64 "$X86_64_URL" "$X86_64_VERSION"
-fetch_metadata aarch64 "$AARCH64_URL" "$AARCH64_VERSION"
+fetch_linux_metadata x86_64-linux x86_64_linux "$X86_64_LINUX_URL" "$X86_64_LINUX_VERSION"
+fetch_linux_metadata aarch64-linux aarch64_linux "$AARCH64_LINUX_URL" "$AARCH64_LINUX_VERSION"
 EOF
 
-source "$metadata_file"
-rm "$metadata_file"
+  source "$metadata_file"
 
-echo "  x86_64 image: ${x86_64_image_version} (sha256: ${x86_64_sha256})"
-echo "  aarch64 image: ${aarch64_image_version} (sha256: ${aarch64_sha256})"
+  echo "  x86_64-linux image: ${x86_64_linux_image_version} (sha256: ${x86_64_linux_sha256})"
+  echo "  aarch64-linux image: ${aarch64_linux_image_version} (sha256: ${aarch64_linux_sha256})"
+  echo "==> Updating package data..."
 
-echo "==> Updating package data..."
-
-cat > "$DATA_DIR/x86_64.nix" <<EOF
-{
-  imageVersion = "${x86_64_image_version}";
-  installerVersion = "${x86_64_installer_version}";
-  url = "${x86_64_url}";
-  sha256 = "${x86_64_sha256}";
-}
-EOF
-
-cat > "$DATA_DIR/aarch64.nix" <<EOF
-{
-  imageVersion = "${aarch64_image_version}";
-  installerVersion = "${aarch64_installer_version}";
-  url = "${aarch64_url}";
-  sha256 = "${aarch64_sha256}";
-}
-EOF
-
-cd "$REPO_ROOT"
-
-if git diff --quiet -- packages/unifi-os-server-image/x86_64.nix packages/unifi-os-server-image/aarch64.nix; then
-  echo "No changes detected, nothing to commit."
-  exit 0
-fi
-
-echo "==> Committing changes..."
-
-if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
-  git config user.name "GitHub Actions"
-  git config user.email "actions@github.com"
-fi
-
-git add packages/unifi-os-server-image/x86_64.nix packages/unifi-os-server-image/aarch64.nix
-git commit -m "chore: update UniFi OS Server installers"
-
-if $PUSH; then
-  echo "==> Pushing..."
-  git push
+  write_linux_data x86_64-linux "$x86_64_linux_image_version" "$x86_64_linux_installer_version" "$x86_64_linux_url" "$x86_64_linux_sha256"
+  write_linux_data aarch64-linux "$aarch64_linux_image_version" "$aarch64_linux_installer_version" "$aarch64_linux_url" "$aarch64_linux_sha256"
 else
-  echo "==> Commit created but not pushed (use --push to push)."
+  x86_64_darwin_json="$(select_download 'UniFi OS Server .* for macOS \(Intel\)$')"
+  aarch64_darwin_json="$(select_download 'UniFi OS Server .* for macOS$')"
+
+  x86_64_darwin_version="$(read_download_field "$x86_64_darwin_json" version)"
+  x86_64_darwin_url="$(read_download_field "$x86_64_darwin_json" file_url)"
+  aarch64_darwin_version="$(read_download_field "$aarch64_darwin_json" version)"
+  aarch64_darwin_url="$(read_download_field "$aarch64_darwin_json" file_url)"
+
+  echo "  x86_64-darwin: ${x86_64_darwin_version} (${x86_64_darwin_url})"
+  echo "  aarch64-darwin: ${aarch64_darwin_version} (${aarch64_darwin_url})"
+  echo "==> Computing hashes and verifying DMGs..."
+
+  fetch_darwin_metadata() {
+    local system="$1"
+    local url="$2"
+    local version="$3"
+    local work
+    local mnt
+
+    work="$(mktemp -d)"
+    curl -fsSL "$url" -o "$work/installer.dmg"
+
+    local sha256
+    sha256="$(nix hash file --type sha256 --base64 "$work/installer.dmg")"
+
+    mnt="$(TMPDIR=/tmp mktemp -d -t unifi-os-XXXXXXXXXX)"
+    /usr/bin/hdiutil attach -nobrowse -mountpoint "$mnt" "$work/installer.dmg" >/dev/null
+
+    local app_bundle
+    app_bundle="$(printf '%s\n' "$mnt"/*.app | head -n1)"
+    if [ ! -d "$app_bundle" ]; then
+      /usr/bin/hdiutil detach "$mnt" -force >/dev/null || true
+      rm -rf "$mnt" "$work"
+      echo "Could not find app bundle in $system DMG" >&2
+      exit 1
+    fi
+
+    /usr/bin/hdiutil detach "$mnt" -force >/dev/null
+    rm -rf "$mnt" "$work"
+
+    printf '%s\n' "sha256-$sha256"
+  }
+
+  x86_64_darwin_sha256="$(fetch_darwin_metadata x86_64-darwin "$x86_64_darwin_url" "$x86_64_darwin_version")"
+  aarch64_darwin_sha256="$(fetch_darwin_metadata aarch64-darwin "$aarch64_darwin_url" "$aarch64_darwin_version")"
+
+  echo "  x86_64-darwin sha256: ${x86_64_darwin_sha256}"
+  echo "  aarch64-darwin sha256: ${aarch64_darwin_sha256}"
+  echo "==> Updating package data..."
+
+  write_darwin_data x86_64-darwin "$x86_64_darwin_version" "$x86_64_darwin_url" "$x86_64_darwin_sha256"
+  write_darwin_data aarch64-darwin "$aarch64_darwin_version" "$aarch64_darwin_url" "$aarch64_darwin_sha256"
 fi
