@@ -1,0 +1,1 @@
+Run tests with `nix build .#unifi-os-server-test`
