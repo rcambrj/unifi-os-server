@@ -167,28 +167,25 @@ else
     local url="$2"
     local version="$3"
     local work
-    local mnt
 
     work="$(mktemp -d)"
+    mkdir -p "$work/extracted"
     curl -fsSL "$url" -o "$work/installer.dmg"
 
     local sha256
     sha256="$(nix hash file --type sha256 --base64 "$work/installer.dmg")"
 
-    mnt="$(TMPDIR=/tmp mktemp -d -t unifi-os-XXXXXXXXXX)"
-    /usr/bin/hdiutil attach -nobrowse -mountpoint "$mnt" "$work/installer.dmg" >/dev/null
+    nix run nixpkgs#_7zz -- x "$work/installer.dmg" "-o$work/extracted" -y >/dev/null
 
     local app_bundle
-    app_bundle="$(printf '%s\n' "$mnt"/*.app | head -n1)"
+    app_bundle="$(find "$work/extracted" -type d -name '*.app' -print -quit)"
     if [ ! -d "$app_bundle" ]; then
-      /usr/bin/hdiutil detach "$mnt" -force >/dev/null || true
-      rm -rf "$mnt" "$work"
+      rm -rf "$work"
       echo "Could not find app bundle in $system DMG" >&2
       exit 1
     fi
 
-    /usr/bin/hdiutil detach "$mnt" -force >/dev/null
-    rm -rf "$mnt" "$work"
+    rm -rf "$work"
 
     printf '%s\n' "sha256-$sha256"
   }

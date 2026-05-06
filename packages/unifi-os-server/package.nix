@@ -36,6 +36,10 @@ pkgs.stdenvNoCC.mkDerivation {
       binwalk
       coreutils
       findutils
+    ]
+    ++ lib.optionals isDarwin [
+      _7zz
+      findutils
     ];
 
   dontUnpack = true;
@@ -43,20 +47,17 @@ pkgs.stdenvNoCC.mkDerivation {
   installPhase =
     if isDarwin then
       ''
+        set -euo pipefail
+
         runHook preInstall
 
         mkdir -p "$out/Applications"
 
-        mnt="$(TMPDIR=/tmp mktemp -d -t nix-XXXXXXXXXX)"
-        finish() {
-          /usr/bin/hdiutil detach "$mnt" -force >/dev/null 2>&1 || true
-          rm -rf "$mnt"
-        }
-        trap finish EXIT
+        work="$PWD/work"
+        mkdir -p "$work"
+        7zz x "$src" "-o$work" -y >/dev/null
 
-        /usr/bin/hdiutil attach -nobrowse -mountpoint "$mnt" "$src"
-
-        app_bundle="$(printf '%s\n' "$mnt"/*.app | head -n1)"
+        app_bundle="$(find "$work" -type d -name '*.app' -print -quit)"
         if [ ! -d "$app_bundle" ]; then
           echo "Could not find UniFi OS Server app bundle in DMG" >&2
           exit 1
