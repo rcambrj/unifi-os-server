@@ -4,20 +4,26 @@ set -euo pipefail
 OS=""
 
 usage() {
-  echo "Usage: $0 --os=linux|darwin" >&2
+  echo "Usage: $0 --linux|--darwin" >&2
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --os=linux) OS="linux"; shift ;;
-    --os=darwin) OS="darwin"; shift ;;
-    --os)
-      if [[ $# -lt 2 ]]; then
-        usage
+    --linux)
+      if [[ -n "$OS" ]]; then
+        echo "Only one of --linux or --darwin may be provided" >&2
         exit 1
       fi
-      OS="$2"
-      shift 2
+      OS="linux"
+      shift
+      ;;
+    --darwin)
+      if [[ -n "$OS" ]]; then
+        echo "Only one of --linux or --darwin may be provided" >&2
+        exit 1
+      fi
+      OS="darwin"
+      shift
       ;;
     *) usage; exit 1 ;;
   esac

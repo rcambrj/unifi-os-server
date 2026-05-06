@@ -19,7 +19,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
 
       - name: Update Linux versions
-        run: ./scripts/update-version.sh --os=linux
+        run: ./scripts/update-version.sh --linux
 
       - name: Prepare Linux package data artifact
         run: |
@@ -41,7 +41,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
 
       - name: Update Darwin versions
-        run: ./scripts/update-version.sh --os=darwin
+        run: ./scripts/update-version.sh --darwin
 
       - name: Prepare Darwin package data artifact
         run: |
