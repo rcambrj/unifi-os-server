@@ -1,8 +1,8 @@
 name: Update UniFi OS Server Version
 
 on:
-  # schedule:
-  #   - cron: "0 * * * *"
+  schedule:
+    - cron: "37 4 * * 5"
   workflow_dispatch:
 
 permissions:
