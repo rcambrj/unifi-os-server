@@ -95,52 +95,45 @@ if [[ "$OS" == "linux" ]]; then
   metadata_file="$(mktemp)"
   trap 'rm -f "$metadata_file"' EXIT
 
-  X86_64_LINUX_URL="$x86_64_linux_url" \
-  X86_64_LINUX_VERSION="$x86_64_linux_version" \
-  AARCH64_LINUX_URL="$aarch64_linux_url" \
-  AARCH64_LINUX_VERSION="$aarch64_linux_version" \
-  METADATA_FILE="$metadata_file" \
-    nix shell nixpkgs#binwalk nixpkgs#gnutar nixpkgs#jq nixpkgs#findutils nixpkgs#coreutils -c bash -euo pipefail <<'EOF'
-fetch_linux_metadata() {
-  local system="$1"
-  local var_prefix="$2"
-  local url="$3"
-  local version="$4"
+  fetch_linux_metadata() {
+    local system="$1"
+    local var_prefix="$2"
+    local url="$3"
+    local version="$4"
 
-  local work
-  work="$(mktemp -d)"
-  mkdir -p "$work/extracted"
+    local work
+    work="$(mktemp -d)"
+    mkdir -p "$work/extracted"
 
-  curl -fsSL "$url" -o "$work/installer"
+    curl -fsSL "$url" -o "$work/installer"
 
-  local sha256
-  sha256="$(nix hash file --type sha256 --base64 "$work/installer")"
+    local sha256
+    sha256="$(nix hash file --type sha256 --base64 "$work/installer")"
 
-  chmod u+w "$work/installer"
-  (cd "$work" && binwalk -e ./installer >/dev/null)
+    chmod u+w "$work/installer"
+    (cd "$work" && nix run nixpkgs#binwalk -- -e ./installer >/dev/null)
 
-  local image_tar
-  image_tar="$(find "$work" -type f -name image.tar | head -n1)"
-  if [ -z "$image_tar" ]; then
-    echo "Could not find embedded image.tar in $system installer" >&2
-    exit 1
-  fi
+    local image_tar
+    image_tar="$(find "$work" -type f -name image.tar | head -n1)"
+    if [ -z "$image_tar" ]; then
+      echo "Could not find embedded image.tar in $system installer" >&2
+      exit 1
+    fi
 
-  tar -xf "$image_tar" -C "$work/extracted"
+    tar -xf "$image_tar" -C "$work/extracted"
 
-  local image_version
-  image_version="$(jq -r '.[0].RepoTags[0]' "$work/extracted/manifest.json" | cut -d: -f2)"
+    local image_version
+    image_version="$(jq -r '.[0].RepoTags[0]' "$work/extracted/manifest.json" | cut -d: -f2)"
 
-  printf '%s_sha256=sha256-%s\n' "$var_prefix" "$sha256" >> "$METADATA_FILE"
-  printf '%s_image_version=%s\n' "$var_prefix" "$image_version" >> "$METADATA_FILE"
-  printf '%s_installer_version=%s\n' "$var_prefix" "$version" >> "$METADATA_FILE"
+    printf '%s_sha256=sha256-%s\n' "$var_prefix" "$sha256" >> "$metadata_file"
+    printf '%s_image_version=%s\n' "$var_prefix" "$image_version" >> "$metadata_file"
+    printf '%s_installer_version=%s\n' "$var_prefix" "$version" >> "$metadata_file"
 
-  rm -rf "$work"
-}
+    rm -rf "$work"
+  }
 
-fetch_linux_metadata x86_64-linux x86_64_linux "$X86_64_LINUX_URL" "$X86_64_LINUX_VERSION"
-fetch_linux_metadata aarch64-linux aarch64_linux "$AARCH64_LINUX_URL" "$AARCH64_LINUX_VERSION"
-EOF
+  fetch_linux_metadata x86_64-linux x86_64_linux "$x86_64_linux_url" "$x86_64_linux_version"
+  fetch_linux_metadata aarch64-linux aarch64_linux "$aarch64_linux_url" "$aarch64_linux_version"
 
   source "$metadata_file"
 
