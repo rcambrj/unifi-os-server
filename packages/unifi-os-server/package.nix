@@ -39,10 +39,13 @@ pkgs.stdenvNoCC.mkDerivation {
     ]
     ++ lib.optionals isDarwin [
       _7zz
+      darwin.cctools
+      darwin.sigtool
       findutils
     ];
 
   dontUnpack = true;
+  dontFixup = isDarwin;
 
   installPhase =
     if isDarwin then
@@ -63,6 +66,13 @@ pkgs.stdenvNoCC.mkDerivation {
           exit 1
         fi
 
+        main_exe="$app_bundle/Contents/MacOS/$(basename "$app_bundle" .app)"
+        if [ ! -f "$main_exe" ]; then
+          echo "Could not find UniFi OS Server main executable at $main_exe" >&2
+          exit 1
+        fi
+
+        codesign --force --sign - "$main_exe"
         cp -R "$app_bundle" "$out/Applications/"
 
         runHook postInstall
