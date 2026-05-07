@@ -29,10 +29,6 @@ Run UniFi OS Server on NixOS with Podman.
           services.unifi-os-server = {
             enable = true;
             openFirewall = true;
-            nginx = {
-              enable = true;
-              domain = "unifi.example.com";
-            };
           };
         }
       ];

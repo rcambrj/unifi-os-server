@@ -87,7 +87,6 @@ let
   ]
   ++ optional cfg.debugLogging "${ucoreDebug}:/etc/systemd/system/unifi-core.service.d/debug.conf:ro";
 
-  nginxUpstream = "https://127.0.0.1:${toString cfg.uiPort}";
 in
 {
   options.services.unifi-os-server = {
@@ -140,17 +139,16 @@ in
 
     firewallPorts = mkOption {
       type = types.listOf types.str;
-      default =
-        optional (!cfg.nginx.enable) "${toString cfg.uiPort}/tcp"
-        ++ [
-          "8080/tcp"
-          "8443/tcp"
-          "8843/tcp"
-          "8880/tcp"
-          "6789/tcp"
-          "3478/udp"
-          "10001/udp"
-        ];
+      default = [
+        "${toString cfg.uiPort}/tcp"
+        "8080/tcp"
+        "8443/tcp"
+        "8843/tcp"
+        "8880/tcp"
+        "6789/tcp"
+        "3478/udp"
+        "10001/udp"
+      ];
       description = "Firewall ports to open in `port/protocol` form when `openFirewall` is enabled.";
     };
 
@@ -171,22 +169,6 @@ in
       default = [ ];
       description = "Extra arguments passed directly to podman.";
     };
-
-    nginx = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        example = false;
-        description = "Whether to configure an nginx virtual host for UniFi OS Server.";
-      };
-
-      domain = mkOption {
-        type = types.nullOr types.str;
-        default = null;
-        example = "unifi.example.com";
-        description = "Domain name used for the nginx virtual host.";
-      };
-    };
   };
 
   config = mkIf cfg.enable {
@@ -197,10 +179,6 @@ in
           || elem "${toString cfg.uiPort}:443/tcp" cfg.portMappings;
         message = "services.unifi-os-server.portMappings must include services.unifi-os-server.uiPort mapped to container port 443.";
       }
-      {
-        assertion = !cfg.nginx.enable || cfg.nginx.domain != null;
-        message = "services.unifi-os-server.nginx.domain must be set when nginx integration is enabled.";
-      }
     ];
 
     virtualisation.podman.enable = true;
@@ -209,19 +187,6 @@ in
     networking.firewall = mkIf cfg.openFirewall {
       allowedTCPPorts = tcpFirewallPorts;
       allowedUDPPorts = udpFirewallPorts;
-    };
-
-    services.nginx = mkIf cfg.nginx.enable {
-      enable = true;
-      virtualHosts.${cfg.nginx.domain} = {
-        locations."/" = {
-          proxyPass = nginxUpstream;
-          proxyWebsockets = true;
-          extraConfig = ''
-            proxy_ssl_verify off;
-          '';
-        };
-      };
     };
 
     systemd.tmpfiles.rules = [
