@@ -25,6 +25,9 @@ Run UniFi OS Server on NixOS with Podman.
       modules = [
         unifi-os-server.nixosModules.unifi-os-server
         {
+          virtualisation.podman.enable = true;
+          virtualisation.oci-containers.backend = "podman";
+
           services.unifi-os-server = {
             enable = true;
             openFirewallUiPort = true;

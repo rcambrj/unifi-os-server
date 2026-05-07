@@ -204,8 +204,16 @@ in
   };
 
   config = mkIf cfg.enable {
-    virtualisation.podman.enable = true;
-    virtualisation.oci-containers.backend = "podman";
+    assertions = [
+      {
+        assertion = config.virtualisation.podman.enable;
+        message = "services.unifi-os-server requires virtualisation.podman.enable = true.";
+      }
+      {
+        assertion = config.virtualisation.oci-containers.backend == "podman";
+        message = "services.unifi-os-server requires virtualisation.oci-containers.backend = \"podman\".";
+      }
+    ];
 
     networking.firewall = {
       allowedTCPPorts =

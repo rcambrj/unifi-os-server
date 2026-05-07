@@ -18,6 +18,8 @@ pkgs.testers.runNixOSTest {
         virtualisation = {
           diskSize = 16384;
           memorySize = 4096;
+          podman.enable = true;
+          oci-containers.backend = "podman";
         };
 
         services.unifi-os-server = {
