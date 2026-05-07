@@ -9,7 +9,7 @@ pkgs.testers.runNixOSTest {
 
   nodes = {
     machine =
-      { ... }:
+      { config, lib, ... }:
       {
         imports = [
           flake.nixosModules.unifi-os-server
@@ -25,10 +25,17 @@ pkgs.testers.runNixOSTest {
           openFirewall = true;
           nginx.enable = false;
         };
+
+        assertions = [
+          {
+            assertion = lib.elem 11443 config.networking.firewall.allowedTCPPorts;
+            message = "Direct UniFi OS Server firewall defaults must include the web port.";
+          }
+        ];
       };
 
     nginxMachine =
-      { ... }:
+      { config, lib, ... }:
       let
         cert =
           pkgs.runCommand "unifi-test-cert"
@@ -72,6 +79,13 @@ pkgs.testers.runNixOSTest {
           sslCertificate = "${cert}/cert.pem";
           sslCertificateKey = "${cert}/key.pem";
         };
+
+        assertions = [
+          {
+            assertion = !(lib.elem 11443 config.networking.firewall.allowedTCPPorts);
+            message = "Nginx UniFi OS Server firewall defaults must not include the direct web port.";
+          }
+        ];
       };
   };
 

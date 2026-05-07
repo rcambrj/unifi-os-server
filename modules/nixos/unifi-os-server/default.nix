@@ -143,16 +143,17 @@ in
 
     firewallPorts = mkOption {
       type = types.listOf types.str;
-      default = [
-        "11443/tcp"
-        "8080/tcp"
-        "8443/tcp"
-        "8843/tcp"
-        "8880/tcp"
-        "6789/tcp"
-        "3478/udp"
-        "10001/udp"
-      ];
+      default =
+        optional (!cfg.nginx.enable && uiPort != null) "${toString uiPort}/tcp"
+        ++ [
+          "8080/tcp"
+          "8443/tcp"
+          "8843/tcp"
+          "8880/tcp"
+          "6789/tcp"
+          "3478/udp"
+          "10001/udp"
+        ];
       description = "Firewall ports to open in `port/protocol` form when `openFirewall` is enabled.";
     };
 
