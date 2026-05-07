@@ -9,7 +9,7 @@ let
   inherit (lib)
     concatMap
     concatStringsSep
-    findFirst
+    elem
     hasPrefix
     head
     importJSON
@@ -58,15 +58,6 @@ let
     builtins.filter (entry: entry.protocol == "udp") parsedFirewallPorts
   );
 
-  uiMapping = findFirst (
-    value: builtins.match "([0-9]+):443(/tcp)?" value != null
-  ) null cfg.portMappings;
-  uiPort =
-    if uiMapping == null then
-      null
-    else
-      builtins.fromJSON (head (builtins.match "([0-9]+):443(/tcp)?" uiMapping));
-
   ucoreDebug = pkgs.writeText "unifi-core-debug.conf" ''
     [Service]
     StandardOutput=append:/data/unifi-core/logs/stdout.log
@@ -96,7 +87,7 @@ let
   ]
   ++ optional cfg.debugLogging "${ucoreDebug}:/etc/systemd/system/unifi-core.service.d/debug.conf:ro";
 
-  nginxUpstream = "https://127.0.0.1:${toString uiPort}";
+  nginxUpstream = "https://127.0.0.1:${toString cfg.uiPort}";
 in
 {
   options.services.unifi-os-server = {
@@ -120,10 +111,16 @@ in
       description = "Whether to capture unifi-core stdout and stderr in the state directory.";
     };
 
+    uiPort = mkOption {
+      type = types.port;
+      default = 11443;
+      description = "Host port used for the UniFi OS Server web UI.";
+    };
+
     portMappings = mkOption {
       type = types.listOf types.str;
       default = [
-        "11443:443"
+        "${toString cfg.uiPort}:443"
         "8080:8080"
         "8443:8443"
         "8843:8843"
@@ -144,7 +141,7 @@ in
     firewallPorts = mkOption {
       type = types.listOf types.str;
       default =
-        optional (!cfg.nginx.enable && uiPort != null) "${toString uiPort}/tcp"
+        optional (!cfg.nginx.enable) "${toString cfg.uiPort}/tcp"
         ++ [
           "8080/tcp"
           "8443/tcp"
@@ -195,8 +192,10 @@ in
   config = mkIf cfg.enable {
     assertions = [
       {
-        assertion = uiPort != null;
-        message = "services.unifi-os-server.portMappings must include a TCP mapping for container port 443.";
+        assertion =
+          elem "${toString cfg.uiPort}:443" cfg.portMappings
+          || elem "${toString cfg.uiPort}:443/tcp" cfg.portMappings;
+        message = "services.unifi-os-server.portMappings must include services.unifi-os-server.uiPort mapped to container port 443.";
       }
       {
         assertion = !cfg.nginx.enable || cfg.nginx.domain != null;

@@ -22,13 +22,14 @@ pkgs.testers.runNixOSTest {
 
         services.unifi-os-server = {
           enable = true;
+          uiPort = 12443;
           openFirewall = true;
           nginx.enable = false;
         };
 
         assertions = [
           {
-            assertion = lib.elem 11443 config.networking.firewall.allowedTCPPorts;
+            assertion = lib.elem 12443 config.networking.firewall.allowedTCPPorts;
             message = "Direct UniFi OS Server firewall defaults must include the web port.";
           }
         ];
@@ -95,7 +96,7 @@ pkgs.testers.runNixOSTest {
     # --- Direct service test (without nginx) ---
     machine.wait_for_unit("podman-unifi-os-server.service")
     machine.wait_until_succeeds(
-        "body=$(curl -ksf https://localhost:11443) && printf '%s' \"$body\" | grep -F 'window.UNIFI_OS_MANIFEST' >/dev/null && printf '%s' \"$body\" | grep -F 'UniFi OS Server' >/dev/null",
+        "body=$(curl -ksf https://localhost:12443) && printf '%s' \"$body\" | grep -F 'window.UNIFI_OS_MANIFEST' >/dev/null && printf '%s' \"$body\" | grep -F 'UniFi OS Server' >/dev/null",
         timeout=120,
     )
 
