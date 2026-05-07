@@ -23,13 +23,22 @@ pkgs.testers.runNixOSTest {
         services.unifi-os-server = {
           enable = true;
           uiPort = 12443;
-          openFirewall = true;
+          openFirewallUiPort = true;
+          openFirewallServicePorts = true;
         };
 
         assertions = [
           {
             assertion = lib.elem 12443 config.networking.firewall.allowedTCPPorts;
             message = "UniFi OS Server firewall defaults must include the web port.";
+          }
+          {
+            assertion = lib.elem 8080 config.networking.firewall.allowedTCPPorts;
+            message = "UniFi OS Server firewall defaults must include service TCP ports.";
+          }
+          {
+            assertion = lib.elem 3478 config.networking.firewall.allowedUDPPorts;
+            message = "UniFi OS Server firewall defaults must include service UDP ports.";
           }
         ];
       };

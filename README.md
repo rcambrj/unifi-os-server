@@ -28,7 +28,8 @@ Run UniFi OS Server on NixOS with Podman.
         {
           services.unifi-os-server = {
             enable = true;
-            openFirewall = true;
+            openFirewallUiPort = true;
+            openFirewallServicePorts = true;
           };
         }
       ];
@@ -39,6 +40,6 @@ Run UniFi OS Server on NixOS with Podman.
 
 ## Credits
 
-Inspired by [this thread on discourse](https://discourse.nixos.org/t/unifi-os-server-on-nixos/76039)
-
-Not affiliated with UniFi
+* Inspired by [this thread on discourse](https://discourse.nixos.org/t/unifi-os-server-on-nixos/76039)
+* Which in turn references [a unihosted.com blog post](https://www.unihosted.com/blog/running-unifi-os-server-in-docker)
+* Not affiliated with UniFi

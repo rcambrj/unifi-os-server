@@ -7,24 +7,20 @@
 }:
 let
   inherit (lib)
-    concatMap
-    concatStringsSep
     elem
-    hasPrefix
     head
     importJSON
-    mapAttrsToList
     mkEnableOption
     mkIf
     mkOption
     optional
     optionals
-    splitString
     types
     ;
 
   cfg = config.services.unifi-os-server;
 
+  imageFile = "${cfg.package}/image.tar";
   imageManifest = importJSON "${cfg.package}/manifest.json";
   imageTag = cfg.package.passthru.imageTag or (head (head imageManifest).RepoTags);
 
@@ -38,25 +34,6 @@ let
   ];
 
   mkStateRule = subdir: "d ${cfg.stateDir}/${subdir} 0755 root root -";
-
-  parseFirewallPort =
-    value:
-    let
-      parts = splitString "/" value;
-    in
-    {
-      port = builtins.fromJSON (head parts);
-      protocol = if builtins.length parts > 1 then builtins.elemAt parts 1 else "tcp";
-    };
-
-  parsedFirewallPorts = map parseFirewallPort cfg.firewallPorts;
-
-  tcpFirewallPorts = map (entry: entry.port) (
-    builtins.filter (entry: entry.protocol == "tcp") parsedFirewallPorts
-  );
-  udpFirewallPorts = map (entry: entry.port) (
-    builtins.filter (entry: entry.protocol == "udp") parsedFirewallPorts
-  );
 
   ucoreDebug = pkgs.writeText "unifi-core-debug.conf" ''
     [Service]
@@ -131,25 +108,16 @@ in
       description = "Port mappings passed to podman in `host:container[/protocol]` form.";
     };
 
-    openFirewall = mkOption {
+    openFirewallUiPort = mkOption {
       type = types.bool;
       default = false;
-      description = "Whether to open the ports listed in `firewallPorts`.";
+      description = "Whether to open the UniFi OS Server web UI port in the firewall.";
     };
 
-    firewallPorts = mkOption {
-      type = types.listOf types.str;
-      default = [
-        "${toString cfg.uiPort}/tcp"
-        "8080/tcp"
-        "8443/tcp"
-        "8843/tcp"
-        "8880/tcp"
-        "6789/tcp"
-        "3478/udp"
-        "10001/udp"
-      ];
-      description = "Firewall ports to open in `port/protocol` form when `openFirewall` is enabled.";
+    openFirewallServicePorts = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Whether to open UniFi OS Server service ports in the firewall.";
     };
 
     environment = mkOption {
@@ -184,9 +152,20 @@ in
     virtualisation.podman.enable = true;
     virtualisation.oci-containers.backend = "podman";
 
-    networking.firewall = mkIf cfg.openFirewall {
-      allowedTCPPorts = tcpFirewallPorts;
-      allowedUDPPorts = udpFirewallPorts;
+    networking.firewall = {
+      allowedTCPPorts =
+        optional cfg.openFirewallUiPort cfg.uiPort
+        ++ optionals cfg.openFirewallServicePorts [
+          8080
+          8443
+          8843
+          8880
+          6789
+        ];
+      allowedUDPPorts = optionals cfg.openFirewallServicePorts [
+        3478
+        10001
+      ];
     };
 
     systemd.tmpfiles.rules = [
@@ -207,7 +186,7 @@ in
 
     virtualisation.oci-containers.containers.unifi-os-server = {
       image = imageTag;
-      imageFile = "${cfg.package}/image.tar";
+      imageFile = imageFile;
       autoStart = true;
       privileged = true;
       ports = cfg.portMappings;
