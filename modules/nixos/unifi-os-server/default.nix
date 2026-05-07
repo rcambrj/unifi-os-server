@@ -7,7 +7,6 @@
 }:
 let
   inherit (lib)
-    elem
     head
     importJSON
     mkEnableOption
@@ -64,6 +63,30 @@ let
   ]
   ++ optional cfg.debugLogging "${ucoreDebug}:/etc/systemd/system/unifi-core.service.d/debug.conf:ro";
 
+  portMappings = [ ]
+  ++ optional (cfg.ports.ui != null) "${toString cfg.ports.ui}:443"
+  ++ optional (cfg.ports.uapDeviceInform != null) "${toString cfg.ports.uapDeviceInform}:8080"
+  ++ optional (cfg.ports.controllerHttps != null) "${toString cfg.ports.controllerHttps}:8443"
+  ++ optional (cfg.ports.mobileSpeedTest != null) "${toString cfg.ports.mobileSpeedTest}:6789"
+  ++ optional (cfg.ports.httpCaptivePortal != null) "${toString cfg.ports.httpCaptivePortal}:8880"
+  ++ optional (cfg.ports.httpsCaptivePortal != null) "${toString cfg.ports.httpsCaptivePortal}:8843"
+  ++ optional (cfg.ports.stun != null) "${toString cfg.ports.stun}:3478/udp"
+  ++ optional (cfg.ports.deviceDiscovery != null) "${toString cfg.ports.deviceDiscovery}:10001/udp"
+  ++ cfg.extraPorts;
+
+  serviceTCPPorts = builtins.filter (port: port != null) [
+    cfg.ports.uapDeviceInform
+    cfg.ports.controllerHttps
+    cfg.ports.mobileSpeedTest
+    cfg.ports.httpCaptivePortal
+    cfg.ports.httpsCaptivePortal
+  ];
+
+  serviceUDPPorts = builtins.filter (port: port != null) [
+    cfg.ports.stun
+    cfg.ports.deviceDiscovery
+  ];
+
 in
 {
   options.services.unifi-os-server = {
@@ -87,25 +110,66 @@ in
       description = "Whether to capture unifi-core stdout and stderr in the state directory.";
     };
 
-    uiPort = mkOption {
-      type = types.port;
-      default = 11443;
-      description = "Host port used for the UniFi OS Server web UI.";
+    ports = mkOption {
+      type = types.submodule {
+        options = {
+          ui = mkOption {
+            type = types.nullOr types.port;
+            default = 11443;
+            description = "Host port used for the UniFi OS Server web UI.";
+          };
+
+          uapDeviceInform = mkOption {
+            type = types.nullOr types.port;
+            default = 8080;
+            description = "Host port used for UAP device inform traffic.";
+          };
+
+          controllerHttps = mkOption {
+            type = types.nullOr types.port;
+            default = 8443;
+            description = "Host port used for UniFi controller HTTPS traffic.";
+          };
+
+          mobileSpeedTest = mkOption {
+            type = types.nullOr types.port;
+            default = 6789;
+            description = "Host port used for UniFi mobile speed tests.";
+          };
+
+          httpCaptivePortal = mkOption {
+            type = types.nullOr types.port;
+            default = 8880;
+            description = "Host port used for UniFi HTTP captive portal traffic.";
+          };
+
+          httpsCaptivePortal = mkOption {
+            type = types.nullOr types.port;
+            default = 8843;
+            description = "Host port used for UniFi HTTPS captive portal traffic.";
+          };
+
+          stun = mkOption {
+            type = types.nullOr types.port;
+            default = 3478;
+            description = "Host UDP port used for STUN traffic.";
+          };
+
+          deviceDiscovery = mkOption {
+            type = types.nullOr types.port;
+            default = 10001;
+            description = "Host UDP port used for UniFi device discovery.";
+          };
+        };
+      };
+      default = { };
+      description = "Host ports used for UniFi OS Server service traffic.";
     };
 
-    portMappings = mkOption {
+    extraPorts = mkOption {
       type = types.listOf types.str;
-      default = [
-        "${toString cfg.uiPort}:443"
-        "8080:8080"
-        "8443:8443"
-        "8843:8843"
-        "8880:8880"
-        "6789:6789"
-        "3478:3478/udp"
-        "10001:10001/udp"
-      ];
-      description = "Port mappings passed to podman in `host:container[/protocol]` form.";
+      default = [ ];
+      description = "Additional port mappings passed to podman in `host:container[/protocol]` form.";
     };
 
     openFirewallUiPort = mkOption {
@@ -140,32 +204,14 @@ in
   };
 
   config = mkIf cfg.enable {
-    assertions = [
-      {
-        assertion =
-          elem "${toString cfg.uiPort}:443" cfg.portMappings
-          || elem "${toString cfg.uiPort}:443/tcp" cfg.portMappings;
-        message = "services.unifi-os-server.portMappings must include services.unifi-os-server.uiPort mapped to container port 443.";
-      }
-    ];
-
     virtualisation.podman.enable = true;
     virtualisation.oci-containers.backend = "podman";
 
     networking.firewall = {
       allowedTCPPorts =
-        optional cfg.openFirewallUiPort cfg.uiPort
-        ++ optionals cfg.openFirewallServicePorts [
-          8080
-          8443
-          8843
-          8880
-          6789
-        ];
-      allowedUDPPorts = optionals cfg.openFirewallServicePorts [
-        3478
-        10001
-      ];
+        optional (cfg.openFirewallUiPort && cfg.ports.ui != null) cfg.ports.ui
+        ++ optionals cfg.openFirewallServicePorts serviceTCPPorts;
+      allowedUDPPorts = optionals cfg.openFirewallServicePorts serviceUDPPorts;
     };
 
     systemd.tmpfiles.rules = [
@@ -189,7 +235,7 @@ in
       imageFile = imageFile;
       autoStart = true;
       privileged = true;
-      ports = cfg.portMappings;
+      ports = portMappings;
 
       environment = {
         UOS_SYSTEM_IP = "127.0.0.1";
