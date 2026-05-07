@@ -132,7 +132,7 @@ import fs from 'fs-extra';" \
   meta = with lib; {
     description = "UniFi OS Server installer package";
     homepage = "https://help.ui.com/hc/en-us/articles/34210126298775-Self-Hosting-UniFi";
-    license = licenses.unfreeRedistributableFirmware;
+    license = licenses.unfree;
     platforms = platforms.linux ++ platforms.darwin;
     sourceProvenance = with sourceTypes; [ binaryNativeCode ];
   };

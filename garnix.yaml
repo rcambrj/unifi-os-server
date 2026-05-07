@@ -1,10 +1,3 @@
 builds:
   include:
-    - 'checks.x86_64-linux.unifi-os-server'
-
-    - 'packages.x86_64-linux.unifi-os-server'
-    - 'packages.aarch64-linux.unifi-os-server'
-    - 'packages.aarch64-darwin.unifi-os-server'
-    - 'packages.x86_64-darwin.unifi-os-server'
-
-incrementalizeBuilds: true
+    - checks.x86_64-linux.unifi-os-server

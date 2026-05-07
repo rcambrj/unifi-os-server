@@ -3,7 +3,6 @@
 Run UniFi OS Server on NixOS with Podman.
 
 * Weekly updates
-* Binary cache courtesy of [garnix.io](https://garnix.io/)
 
 > Current state: experimental
 
