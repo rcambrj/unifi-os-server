@@ -77,7 +77,7 @@ in
 
     stateDir = mkOption {
       type = types.str;
-      default = "/var/lib/unifi-os";
+      default = "/var/lib/unifi-os-server";
       description = "Directory used for UniFi OS Server state and logs.";
     };
 
