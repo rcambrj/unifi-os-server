@@ -39,6 +39,7 @@ pkgs.stdenvNoCC.mkDerivation {
     ]
     ++ lib.optionals isDarwin [
       _7zz
+      asar
       darwin.cctools
       darwin.sigtool
       findutils
@@ -65,6 +66,26 @@ pkgs.stdenvNoCC.mkDerivation {
           echo "Could not find UniFi OS Server app bundle in DMG" >&2
           exit 1
         fi
+
+        app_asar="$app_bundle/Contents/Resources/app.asar"
+        app_asar_dir="$work/app-asar"
+        asar extract "$app_asar" "$app_asar_dir"
+        podman_helper="$app_asar_dir/dist/js/app/helpers/podman/PodmanCommandHelper.js"
+        substituteInPlace "$podman_helper" \
+          --replace-fail "import logger from 'electron-log';" "import logger from 'electron-log';
+import fs from 'fs-extra';" \
+          --replace-fail "import { PODMAN_ENV, PODMAN_MACHINE_NAME, RESOURCES_PATH, } from '../../constants.js';" "import { CONTAINERS_DIR, PODMAN_ENV, PODMAN_MACHINE_NAME, RESOURCES_PATH, } from '../../constants.js';" \
+          --replace-fail "path.join(RESOURCES_PATH, 'podman-machine.raw.zst')" "await (async () => {
+                    const cachedPath = path.join(CONTAINERS_DIR, 'podman-machine.raw.zst');
+                    if (!await fs.pathExists(cachedPath)) {
+                        await fs.ensureDir(CONTAINERS_DIR);
+                        await fs.copy(path.join(RESOURCES_PATH, ['podman-machine.raw.zst'][0]), cachedPath);
+                        await fs.chmod(cachedPath, 0o600);
+                    }
+                    return cachedPath;
+                })()"
+        rm "$app_asar"
+        asar pack "$app_asar_dir" "$app_asar"
 
         main_exe="$app_bundle/Contents/MacOS/$(basename "$app_bundle" .app)"
         if [ ! -f "$main_exe" ]; then
