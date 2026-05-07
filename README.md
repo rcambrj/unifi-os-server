@@ -2,7 +2,7 @@
 
 Run UniFi OS Server on NixOS with Podman.
 
-* Updates weekly
+* Weekly updates
 * Binary cache courtesy of [garnix.io](https://garnix.io/)
 
 > Current state: experimental
@@ -40,3 +40,9 @@ Run UniFi OS Server on NixOS with Podman.
   };
 }
 ```
+
+## Credits
+
+Inspired by [this thread on discourse](https://discourse.nixos.org/t/unifi-os-server-on-nixos/76039)
+
+Not affiliated with UniFi
