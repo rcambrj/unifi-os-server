@@ -30,6 +30,7 @@ Run UniFi OS Server on NixOS with Podman.
 
           services.unifi-os-server = {
             enable = true;
+            uosSystemIP = "192.168.1.10";
             openFirewallUiPort = true;
             openFirewallServicePorts = true;
           };
@@ -39,6 +40,10 @@ Run UniFi OS Server on NixOS with Podman.
   };
 }
 ```
+
+`uosSystemIP` defaults to `127.0.0.1`. Set it to the IP address UniFi devices can reach
+for this UniFi OS Server. This is the inform IP address used in adoption URLs such as
+`http://192.168.1.10:8080/inform`.
 
 ## Credits
 

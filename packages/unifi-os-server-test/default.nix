@@ -24,6 +24,7 @@ pkgs.testers.runNixOSTest {
 
         services.unifi-os-server = {
           enable = true;
+          uosSystemIP = "192.0.2.10";
           extraPorts = [
             "19000:9000/tcp"
           ];
@@ -81,6 +82,12 @@ pkgs.testers.runNixOSTest {
                 "19000:9000/tcp"
               ];
             message = "container ports must be generated from configured ports plus extraPorts.";
+          }
+          {
+            assertion =
+              config.virtualisation.oci-containers.containers.unifi-os-server.environment.UOS_SYSTEM_IP
+              == "192.0.2.10";
+            message = "container environment must use the configured UOS_SYSTEM_IP.";
           }
         ];
       };
