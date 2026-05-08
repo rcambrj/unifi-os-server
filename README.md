@@ -10,7 +10,7 @@ Run UniFi OS Server on NixOS with Podman.
 
 ```nix
 {
-  inputs.unifi-os-server.url = "github:rcambrj/nix-unifi-os-server";
+  inputs.unifi-os-server.url = "github:rcambrj/unifi-os-server";
 
   outputs = { nixpkgs, unifi-os-server, ... }: {
     nixosConfigurations.host = let
