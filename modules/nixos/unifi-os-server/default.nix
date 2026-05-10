@@ -267,6 +267,7 @@ in
       extraOptions = [
         "--systemd=always"
         "--add-host=host.docker.internal:host-gateway"
+        "--pids-limit=8192"
       ]
       ++ cfg.extraOptions;
     };
