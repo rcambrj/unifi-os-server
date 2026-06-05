@@ -1,6 +1,6 @@
 {
-  imageVersion = "0.0.56";
-  installerVersion = "5.0.8";
-  url = "https://fw-download.ubnt.com/data/unifi-os-server/c2e4-linux-x64-5.0.8-bcb62759-753a-4be2-8546-a6e0de63e59a.8-x64";
-  sha256 = "sha256-2xdlbyItNx2l+W7RBOM1A74WynVYF/EmQJtn2ACbFBk=";
+  imageVersion = "f77bca81ecbf";
+  installerVersion = "5.1.15";
+  url = "https://fw-download.ubnt.com/data/unifi-os-server/24e0-linux-x64-5.1.15-926621de-c9d7-48cd-8921-a0ff3eebd3f4.15-x64";
+  sha256 = "sha256-BMjkAes0Mw/pnZTzWqNR4ODpeJXw2aS0Wf80+1DK0rs=";
 }
