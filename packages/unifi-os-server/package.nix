@@ -70,7 +70,7 @@ pkgs.stdenvNoCC.mkDerivation {
         app_asar="$app_bundle/Contents/Resources/app.asar"
         app_asar_dir="$work/app-asar"
         asar extract "$app_asar" "$app_asar_dir"
-        podman_helper="$app_asar_dir/dist/js/app/helpers/podman/PodmanCommandHelper.js"
+        podman_helper="$app_asar_dir/dist/js/electron-service/helpers/podman/PodmanCommandHelper.js"
         substituteInPlace "$podman_helper" \
           --replace-fail "import logger from 'electron-log';" "import logger from 'electron-log';
 import fs from 'fs-extra';" \
