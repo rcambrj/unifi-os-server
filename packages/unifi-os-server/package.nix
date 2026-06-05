@@ -110,7 +110,7 @@ import fs from 'fs-extra';" \
         chmod u+w "$work/unifi-os-installer"
         cd "$work"
 
-        binwalk -e ./unifi-os-installer >/dev/null
+        binwalk --threads 1 -e ./unifi-os-installer >/dev/null
 
         image_tar="$(find . -type f -name image.tar | head -n1)"
         if [ -z "$image_tar" ]; then
