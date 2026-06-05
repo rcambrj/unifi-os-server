@@ -47,6 +47,10 @@ let
 
     [Service]
     ExecStartPre=-/bin/mkdir -p /data/unifi-core/config/http
+  '';
+
+  nginxPreStartFix = pkgs.writeText "nginx-prestart-fix.conf" ''
+    [Service]
     ExecStartPre=-/bin/mkdir -p /var/log/nginx
   '';
 
@@ -82,6 +86,7 @@ let
     "${fakeNtpService}:/etc/systemd/system/unifi-os-server-fake-ntp.service:ro"
     "${fakeNtpList}:/etc/systemd/ntp-units.d/unifi-os-server-fake-ntp.list:ro"
     "${ucorePreStartFix}:/etc/systemd/system/unifi-core.service.d/prestart-fix.conf:ro"
+    "${nginxPreStartFix}:/etc/systemd/system/nginx.service.d/prestart-fix.conf:ro"
     "${mongoPreStartFix}:/etc/systemd/system/mongodb.service.d/prestart-fix.conf:ro"
   ]
   ++ optional cfg.debugLogging "${ucoreDebug}:/etc/systemd/system/unifi-core.service.d/debug.conf:ro";
