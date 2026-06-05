@@ -284,6 +284,9 @@ in
       ports = portMappings;
 
       environment = {
+        APP_MODEL = "UOSSERVER";
+        APP_VERSION = cfg.package.version;
+        PRODUCT_NAME = "uosserver";
         UOS_SYSTEM_IP = cfg.uosSystemIP;
         UOS_SERVER_VERSION = cfg.package.version;
         FIRMWARE_PLATFORM = if pkgs.stdenv.hostPlatform.isAarch64 then "linux-arm64" else "linux-x64";
