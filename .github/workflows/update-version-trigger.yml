@@ -1,4 +1,4 @@
-name: Update UniFi OS Server Version (scheduled)
+name: Update all versions (scheduled)
 
 on:
   schedule:
