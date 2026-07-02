@@ -13,6 +13,8 @@ jobs:
     with:
       platform: linux
   update-darwin:
+    needs: update-linux
+    if: always()
     uses: ./.github/workflows/update-version.yml
     with:
       platform: darwin
