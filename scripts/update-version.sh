@@ -81,7 +81,7 @@ write_darwin_data() {
 EOF
 }
 
-echo "==> Fetching latest UniFi OS Server $OS installers..."
+echo "==> Fetching latest UniFi OS Server $OS installers..." >&2
 
 API_JSON="$(curl -fsSL https://download.svc.ui.com/v1/downloads/products/slugs/unifi-os-server)"
 
@@ -94,9 +94,14 @@ if [[ "$OS" == "linux" ]]; then
   aarch64_linux_version="$(read_download_field "$aarch64_linux_json" version)"
   aarch64_linux_url="$(read_download_field "$aarch64_linux_json" file_url)"
 
-  echo "  x86_64-linux: ${x86_64_linux_version} (${x86_64_linux_url})"
-  echo "  aarch64-linux: ${aarch64_linux_version} (${aarch64_linux_url})"
-  echo "==> Computing hashes and extracting image versions..."
+  if [[ "$x86_64_linux_version" != "$aarch64_linux_version" ]]; then
+    echo "Linux installer versions do not match: x86_64-linux=${x86_64_linux_version}, aarch64-linux=${aarch64_linux_version}" >&2
+    exit 1
+  fi
+
+  echo "  x86_64-linux: ${x86_64_linux_version} (${x86_64_linux_url})" >&2
+  echo "  aarch64-linux: ${aarch64_linux_version} (${aarch64_linux_url})" >&2
+  echo "==> Computing hashes and extracting image versions..." >&2
 
   metadata_file="$(mktemp)"
   trap 'rm -f "$metadata_file"' EXIT
@@ -143,12 +148,14 @@ if [[ "$OS" == "linux" ]]; then
 
   source "$metadata_file"
 
-  echo "  x86_64-linux image: ${x86_64_linux_image_version} (sha256: ${x86_64_linux_sha256})"
-  echo "  aarch64-linux image: ${aarch64_linux_image_version} (sha256: ${aarch64_linux_sha256})"
-  echo "==> Updating package data..."
+  echo "  x86_64-linux image: ${x86_64_linux_image_version} (sha256: ${x86_64_linux_sha256})" >&2
+  echo "  aarch64-linux image: ${aarch64_linux_image_version} (sha256: ${aarch64_linux_sha256})" >&2
+  echo "==> Updating package data..." >&2
 
   write_linux_data x86_64-linux "$x86_64_linux_image_version" "$x86_64_linux_installer_version" "$x86_64_linux_url" "$x86_64_linux_sha256"
   write_linux_data aarch64-linux "$aarch64_linux_image_version" "$aarch64_linux_installer_version" "$aarch64_linux_url" "$aarch64_linux_sha256"
+
+  printf '%s\n' "$x86_64_linux_installer_version"
 else
   x86_64_darwin_json="$(select_download 'UniFi OS Server .* for macOS \(Intel\)$')"
   aarch64_darwin_json="$(select_download 'UniFi OS Server .* for macOS$')"
@@ -158,9 +165,14 @@ else
   aarch64_darwin_version="$(read_download_field "$aarch64_darwin_json" version)"
   aarch64_darwin_url="$(read_download_field "$aarch64_darwin_json" file_url)"
 
-  echo "  x86_64-darwin: ${x86_64_darwin_version} (${x86_64_darwin_url})"
-  echo "  aarch64-darwin: ${aarch64_darwin_version} (${aarch64_darwin_url})"
-  echo "==> Computing hashes and verifying DMGs..."
+  if [[ "$x86_64_darwin_version" != "$aarch64_darwin_version" ]]; then
+    echo "Darwin installer versions do not match: x86_64-darwin=${x86_64_darwin_version}, aarch64-darwin=${aarch64_darwin_version}" >&2
+    exit 1
+  fi
+
+  echo "  x86_64-darwin: ${x86_64_darwin_version} (${x86_64_darwin_url})" >&2
+  echo "  aarch64-darwin: ${aarch64_darwin_version} (${aarch64_darwin_url})" >&2
+  echo "==> Computing hashes and verifying DMGs..." >&2
 
   fetch_darwin_metadata() {
     local system="$1"
@@ -193,10 +205,12 @@ else
   x86_64_darwin_sha256="$(fetch_darwin_metadata x86_64-darwin "$x86_64_darwin_url" "$x86_64_darwin_version")"
   aarch64_darwin_sha256="$(fetch_darwin_metadata aarch64-darwin "$aarch64_darwin_url" "$aarch64_darwin_version")"
 
-  echo "  x86_64-darwin sha256: ${x86_64_darwin_sha256}"
-  echo "  aarch64-darwin sha256: ${aarch64_darwin_sha256}"
-  echo "==> Updating package data..."
+  echo "  x86_64-darwin sha256: ${x86_64_darwin_sha256}" >&2
+  echo "  aarch64-darwin sha256: ${aarch64_darwin_sha256}" >&2
+  echo "==> Updating package data..." >&2
 
   write_darwin_data x86_64-darwin "$x86_64_darwin_version" "$x86_64_darwin_url" "$x86_64_darwin_sha256"
   write_darwin_data aarch64-darwin "$aarch64_darwin_version" "$aarch64_darwin_url" "$aarch64_darwin_sha256"
+
+  printf '%s\n' "$x86_64_darwin_version"
 fi
