@@ -54,7 +54,7 @@ jobs:
           path: artifact
 
   commit:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     needs:
       - update-linux
       - update-darwin
@@ -68,13 +68,25 @@ jobs:
           path: .
           merge-multiple: true
 
-      - name: Commit and push
+      - name: Check for changes
+        id: changes
         run: |
           if git diff --quiet -- packages/unifi-os-server/*.nix; then
-            echo No changes detected, nothing to commit
-            exit 0
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - uses: DeterminateSystems/nix-installer-action@main
+        if: steps.changes.outputs.changed == 'true'
+
+      - name: Run NixOS test suite
+        if: steps.changes.outputs.changed == 'true'
+        run: nix build .#unifi-os-server-test --no-link
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add packages/unifi-os-server/*.nix
