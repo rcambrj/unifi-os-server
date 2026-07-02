@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   update:
@@ -40,7 +41,10 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
 
       - name: Update versions
-        run: ./scripts/update-version.sh --${{ inputs.platform }}
+        id: update
+        run: |
+          version="$(./scripts/update-version.sh --${{ inputs.platform }})"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Check for changes
         id: changes
@@ -61,5 +65,49 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add packages/unifi-os-server/*-${{ inputs.platform }}.nix
-          git commit -m "chore: update UniFi OS Server ${{ inputs.platform }} package version"
+          git commit -m "chore: update ${{ inputs.platform }} package version"
           git push
+
+      - name: Create or reopen failure issue
+        if: failure() && steps.update.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM: ${{ inputs.platform }}
+          VERSION: ${{ steps.update.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="${PLATFORM} update failed for version ${VERSION}"
+          existing_issue="$(
+            gh issue list \
+              --state all \
+              --search "$title in:title" \
+              --json number,title,state \
+              --jq ".[] | select(.title == \"$title\") | {number,state}" \
+              | jq -s '.[0] // empty'
+          )"
+
+          if [ -n "$existing_issue" ]; then
+            number="$(jq -r '.number' <<<"$existing_issue")"
+            state="$(jq -r '.state' <<<"$existing_issue")"
+
+            if [ "$state" = "CLOSED" ]; then
+              gh issue reopen "$number"
+              gh issue comment "$number" --body "Reopened because the automated ${PLATFORM} update failed again for version ${VERSION}.
+
+              Run: ${RUN_URL}
+              Ref: ${{ github.ref }}
+              SHA: ${{ github.sha }}
+              Event: ${{ github.event_name }}"
+            fi
+
+            exit 0
+          fi
+
+          gh issue create \
+            --title "$title" \
+            --body "The automated ${PLATFORM} update failed for version ${VERSION}.
+
+          Run: ${RUN_URL}
+          Ref: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          Event: ${{ github.event_name }}"
