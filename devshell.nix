@@ -1,7 +1,9 @@
 { pkgs }:
 pkgs.mkShell {
   # Add build dependencies
-  packages = [ ];
+  packages = with pkgs; [
+    actionlint
+  ];
 
   # Add environment variables
   env = { };
