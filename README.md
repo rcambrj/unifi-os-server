@@ -4,7 +4,7 @@ Run UniFi OS Server on NixOS with Podman.
 
 * Weekly updates
 
-> Current state: experimental
+> Current state: unstable
 
 ## Usage
 
