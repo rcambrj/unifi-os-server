@@ -273,6 +273,18 @@ in
         if ! grep -qP '^[0-9a-f]{8}-[0-9a-f]{4}-5' "$uuid_file" 2>/dev/null; then
           ${pkgs.util-linux}/bin/uuidgen -s -n @dns -N "$(cat /etc/machine-id)" > "$uuid_file"
         fi
+
+        system_properties="${cfg.stateDir}/unifi/system.properties"
+        system_ip=${lib.escapeShellArg cfg.uosSystemIP}
+        if [ -s "$system_properties" ]; then
+          if ${pkgs.gnugrep}/bin/grep -q '^system_ip=' "$system_properties"; then
+            ${pkgs.gnused}/bin/sed -i "s|^system_ip=.*|system_ip=$system_ip|" "$system_properties"
+          else
+            printf '\n%s\n' "system_ip=$system_ip" >> "$system_properties"
+          fi
+        else
+          printf 'system_ip=%s\n' "$system_ip" > "$system_properties"
+        fi
       '';
     };
 
@@ -287,7 +299,6 @@ in
         APP_MODEL = "UOSSERVER";
         APP_VERSION = cfg.package.version;
         PRODUCT_NAME = "uosserver";
-        UOS_SYSTEM_IP = cfg.uosSystemIP;
         UOS_SERVER_VERSION = cfg.package.version;
         FIRMWARE_PLATFORM = if pkgs.stdenv.hostPlatform.isAarch64 then "linux-arm64" else "linux-x64";
       }

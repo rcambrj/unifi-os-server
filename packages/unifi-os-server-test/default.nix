@@ -8,7 +8,7 @@ pkgs.testers.runNixOSTest {
 
   nodes = {
     machine =
-      { pkgs, ... }:
+      { lib, pkgs, ... }:
       let
         completeSetupWizard = pkgs.writers.writePython3Bin "complete-unifi-setup-wizard" {
           flakeIgnore = [
@@ -158,7 +158,7 @@ pkgs.testers.runNixOSTest {
               WebDriverWait(driver, 300).until(lambda d: "Inform URL" in page_text(d))
               click_text(driver, "inform url")
               actual_inform_url = WebDriverWait(driver, 30).until(clipboard_text)
-              assert actual_inform_url == "http://127.0.0.1:8080/inform", actual_inform_url
+              assert actual_inform_url == "http://192.0.2.10:8080/inform", actual_inform_url
           finally:
               driver.quit()
         '';
@@ -187,7 +187,18 @@ pkgs.testers.runNixOSTest {
 
         services.unifi-os-server = {
           enable = true;
+          uosSystemIP = "192.0.2.10";
         };
+
+        systemd.services.podman-unifi-os-server.preStart = lib.mkBefore ''
+          system_properties="/var/lib/unifi-os-server/unifi/system.properties"
+          if [ ! -e "$system_properties" ]; then
+            printf '%s\n' \
+              'unifi.https.hsts=true' \
+              '# system_ip=a.b.c.d' \
+              > "$system_properties"
+          fi
+        '';
       };
   };
 
@@ -195,6 +206,7 @@ pkgs.testers.runNixOSTest {
     start_all()
 
     machine.wait_for_unit("podman-unifi-os-server.service")
+    machine.succeed("grep -Fx 'system_ip=192.0.2.10' /var/lib/unifi-os-server/unifi/system.properties")
     machine.wait_until_succeeds(
         "body=$(curl -ksf https://localhost:11443) && printf '%s' \"$body\" | grep -F 'window.UNIFI_OS_MANIFEST' >/dev/null && printf '%s' \"$body\" | grep -F 'UniFi OS Server' >/dev/null",
         timeout=120,
