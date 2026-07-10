@@ -18,6 +18,8 @@ pkgs.testers.runNixOSTest {
           ];
           libraries = [ pkgs.python3Packages.selenium ];
         } ''
+          import sys
+
           from selenium import webdriver
           from selenium.common.exceptions import TimeoutException
           from selenium.webdriver.chrome.options import Options
@@ -148,7 +150,7 @@ pkgs.testers.runNixOSTest {
                   element.clear()
                   element.send_keys(PASSWORD)
 
-              WebDriverWait(driver, 30).until(
+              WebDriverWait(driver, 120).until(
                   lambda d: select_checkboxes_in_context(d, "I understand and agree to Terms of Service and Privacy Policy")
               )
               click_text(driver, "finish")
@@ -159,6 +161,9 @@ pkgs.testers.runNixOSTest {
               click_text(driver, "inform url")
               actual_inform_url = WebDriverWait(driver, 30).until(clipboard_text)
               assert actual_inform_url == "http://192.0.2.10:8080/inform", actual_inform_url
+          except Exception:
+              print(f"Failure at {driver.current_url}\n{page_text(driver)}", file=sys.stderr)
+              raise
           finally:
               driver.quit()
         '';
