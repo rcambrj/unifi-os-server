@@ -1,5 +1,5 @@
 {
-  installerVersion = "5.1.19";
-  url = "https://fw-download.ubnt.com/data/unifi-os-server/a235-macOS-dmg-arm64-5.1.19-6eaf46f9-86da-4b8e-8ca8-8317d4db61bf.dmg";
-  sha256 = "sha256-LypDuMnVITnprxPAU6vjO2NLHvbgooua69azyzMkgDI=";
+  installerVersion = "5.1.21";
+  url = "https://fw-download.ubnt.com/data/unifi-os-server/0d75-macOS-dmg-arm64-5.1.21-0c8076c5-1cc5-4fe8-9b41-ad6eb37bc4fe.dmg";
+  sha256 = "sha256-3aVwu7M4R0/EHVbzonK1uOVeyDtxXGXa0E0o+K7C3oE=";
 }
