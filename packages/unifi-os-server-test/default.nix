@@ -104,32 +104,23 @@ pkgs.testers.runNixOSTest {
               )
 
 
-          def select_checkboxes_in_context(driver, context_text):
+          def select_terms_checkboxes(driver):
               return driver.execute_script(
                   """
-                  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set;
-                  const contextText = arguments[0].toLowerCase();
-                  const context = [...document.querySelectorAll("*")]
-                    .filter((element) => element.innerText && element.innerText.toLowerCase().includes(contextText))
-                    .filter((element) => element.querySelector("input[type='checkbox']"))
-                    .sort((a, b) => a.innerText.length - b.innerText.length)[0];
-
-                  if (!context) {
+                  const checkbox = document.querySelector("input.ps-contract-target[type='checkbox']");
+                  if (!checkbox) {
                     return false;
                   }
 
-                  const inputs = [...context.querySelectorAll("input[type='checkbox']")];
-                  for (const input of inputs) {
-                    if (!input.checked) {
-                      setter.call(input, true);
-                      input.dispatchEvent(new Event("input", { bubbles: true }));
-                      input.dispatchEvent(new Event("change", { bubbles: true }));
-                    }
+                  if (!checkbox.checked) {
+                    checkbox.click();
                   }
 
-                  return inputs.every((input) => input.checked);
-                  """,
-                  context_text,
+                  const finish = [...document.querySelectorAll("button")]
+                    .find((button) => button.innerText.trim().toLowerCase() === "finish");
+
+                  return checkbox.checked && finish && !finish.disabled;
+                  """
               )
 
 
@@ -200,7 +191,7 @@ pkgs.testers.runNixOSTest {
                   driver,
                   120,
                   "selecting Terms checkbox",
-                  lambda d: select_checkboxes_in_context(d, "I understand and agree to Terms of Service and Privacy Policy")
+                  select_terms_checkboxes
               )
               click_text(driver, "finish")
               wait_until(
