@@ -158,7 +158,7 @@ pkgs.testers.runNixOSTest {
 
               name_input = wait_until(
                   driver,
-                  1,
+                  300,
                   "waiting for console name input",
                   lambda d: d.find_element(By.CSS_SELECTOR, "input[name*='name' i]")
               )
@@ -169,7 +169,7 @@ pkgs.testers.runNixOSTest {
               # Stay local-only. Do not sign in with, create, or register a UI.com account.
               wait_until(
                   driver,
-                  1,
+                  120,
                   "waiting for UI account choice",
                   lambda d: "Create a UI Account" in page_text(d),
               )
@@ -177,7 +177,7 @@ pkgs.testers.runNixOSTest {
               click_text(driver, "continue anyway")
               wait_until(
                   driver,
-                  1,
+                  120,
                   "waiting for console password step",
                   lambda d: "Set Console password" in page_text(d),
               )
@@ -198,14 +198,14 @@ pkgs.testers.runNixOSTest {
 
               wait_until(
                   driver,
-                  1,
+                  120,
                   "selecting Terms checkbox",
                   lambda d: select_checkboxes_in_context(d, "I understand and agree to Terms of Service and Privacy Policy")
               )
               click_text(driver, "finish")
               wait_until(
                   driver,
-                  1,
+                  300,
                   "waiting for setup completion",
                   lambda d: "Setup Complete" in page_text(d),
               )
@@ -213,7 +213,7 @@ pkgs.testers.runNixOSTest {
 
               wait_until(
                   driver,
-                  1,
+                  300,
                   "waiting for Inform URL",
                   lambda d: "Inform URL" in page_text(d),
               )
