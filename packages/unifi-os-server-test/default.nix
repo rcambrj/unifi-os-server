@@ -107,19 +107,21 @@ pkgs.testers.runNixOSTest {
           def select_terms_checkboxes(driver):
               return driver.execute_script(
                   """
-                  const checkbox = document.querySelector("input.ps-contract-target[type='checkbox']");
-                  if (!checkbox) {
+                  const checkboxes = [...document.querySelectorAll("input[name='tosAndEula'][type='checkbox']")];
+                  if (checkboxes.length === 0) {
                     return false;
                   }
 
-                  if (!checkbox.checked) {
-                    checkbox.click();
+                  for (const checkbox of checkboxes) {
+                    if (!checkbox.checked) {
+                      checkbox.click();
+                    }
                   }
 
                   const finish = [...document.querySelectorAll("button")]
                     .find((button) => button.innerText.trim().toLowerCase() === "finish");
 
-                  return checkbox.checked && finish && !finish.disabled;
+                  return checkboxes.every((checkbox) => checkbox.checked) && finish && !finish.disabled;
                   """
               )
 
