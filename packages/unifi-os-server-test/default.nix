@@ -18,10 +18,8 @@ pkgs.testers.runNixOSTest {
           ];
           libraries = [ pkgs.python3Packages.selenium ];
         } ''
-          import sys
-
           from selenium import webdriver
-          from selenium.common.exceptions import TimeoutException
+          from selenium.common.exceptions import TimeoutException, WebDriverException
           from selenium.webdriver.chrome.options import Options
           from selenium.webdriver.chrome.service import Service
           from selenium.webdriver.common.by import By
@@ -33,6 +31,37 @@ pkgs.testers.runNixOSTest {
 
           def page_text(driver):
               return driver.find_element(By.TAG_NAME, "body").text
+
+
+          def page_html(driver):
+              return driver.execute_script("return document.documentElement.outerHTML")
+
+
+          def safe_page_html(driver):
+              try:
+                  return page_html(driver)
+              except Exception as exception:
+                  return f"<failed to read page HTML: {exception}>"
+
+
+          def timeout_message(driver, description):
+              return f"Timed out {description} at {driver.current_url}\n\nPage HTML:\n{safe_page_html(driver)}"
+
+
+          def wait_until(driver, timeout, description, condition):
+              def check(_driver):
+                  try:
+                      return condition(_driver)
+                  except WebDriverException:
+                      return False
+
+              try:
+                  return WebDriverWait(driver, timeout).until(check, timeout_message(driver, description))
+              except TimeoutException as exception:
+                  exception.msg = timeout_message(driver, description)
+                  exception.screen = None
+                  exception.stacktrace = None
+                  raise
 
           def click_text(driver, label, timeout=30):
               lower_label = label.lower()
@@ -60,9 +89,10 @@ pkgs.testers.runNixOSTest {
               try:
                   element = WebDriverWait(driver, timeout).until(find)
               except TimeoutException as exception:
-                  raise TimeoutException(
-                      f"Timed out clicking {label!r} at {driver.current_url}\n{page_text(driver)}"
-                  ) from exception
+                  exception.msg = timeout_message(driver, f"clicking {label!r}")
+                  exception.screen = None
+                  exception.stacktrace = None
+                  raise
               element.click()
 
           def clipboard_text(driver):
@@ -126,7 +156,10 @@ pkgs.testers.runNixOSTest {
               )
               driver.get("https://localhost:11443")
 
-              name_input = WebDriverWait(driver, 300).until(
+              name_input = wait_until(
+                  driver,
+                  1,
+                  "waiting for console name input",
                   lambda d: d.find_element(By.CSS_SELECTOR, "input[name*='name' i]")
               )
               name_input.clear()
@@ -134,12 +167,25 @@ pkgs.testers.runNixOSTest {
               click_text(driver, "next")
 
               # Stay local-only. Do not sign in with, create, or register a UI.com account.
-              WebDriverWait(driver, 120).until(lambda d: "Create a UI Account" in page_text(d))
+              wait_until(
+                  driver,
+                  1,
+                  "waiting for UI account choice",
+                  lambda d: "Create a UI Account" in page_text(d),
+              )
               click_text(driver, "proceed without a ui account")
               click_text(driver, "continue anyway")
-              WebDriverWait(driver, 120).until(lambda d: "Set Console password" in page_text(d))
+              wait_until(
+                  driver,
+                  1,
+                  "waiting for console password step",
+                  lambda d: "Set Console password" in page_text(d),
+              )
 
-              password_inputs = WebDriverWait(driver, 30).until(
+              password_inputs = wait_until(
+                  driver,
+                  30,
+                  "waiting for password inputs",
                   lambda d: [
                       element
                       for element in d.find_elements(By.CSS_SELECTOR, "input[type='password']")
@@ -150,20 +196,35 @@ pkgs.testers.runNixOSTest {
                   element.clear()
                   element.send_keys(PASSWORD)
 
-              WebDriverWait(driver, 120).until(
+              wait_until(
+                  driver,
+                  1,
+                  "selecting Terms checkbox",
                   lambda d: select_checkboxes_in_context(d, "I understand and agree to Terms of Service and Privacy Policy")
               )
               click_text(driver, "finish")
-              WebDriverWait(driver, 300).until(lambda d: "Setup Complete" in page_text(d))
+              wait_until(
+                  driver,
+                  1,
+                  "waiting for setup completion",
+                  lambda d: "Setup Complete" in page_text(d),
+              )
               click_text(driver, "go to dashboard")
 
-              WebDriverWait(driver, 300).until(lambda d: "Inform URL" in page_text(d))
+              wait_until(
+                  driver,
+                  1,
+                  "waiting for Inform URL",
+                  lambda d: "Inform URL" in page_text(d),
+              )
               click_text(driver, "inform url")
-              actual_inform_url = WebDriverWait(driver, 30).until(clipboard_text)
+              actual_inform_url = wait_until(
+                  driver,
+                  30,
+                  "waiting for clipboard Inform URL",
+                  clipboard_text,
+              )
               assert actual_inform_url == "http://192.0.2.10:8080/inform", actual_inform_url
-          except Exception:
-              print(f"Failure at {driver.current_url}\n{page_text(driver)}", file=sys.stderr)
-              raise
           finally:
               driver.quit()
         '';

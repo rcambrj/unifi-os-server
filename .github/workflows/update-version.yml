@@ -57,7 +57,7 @@ jobs:
 
       - name: Run NixOS test suite (linux only)
         if: steps.changes.outputs.changed == 'true' && inputs.platform == 'linux'
-        run: nix build .#unifi-os-server-test --no-link
+        run: nix build -L .#unifi-os-server-test --no-link
 
       - name: Commit and push
         if: steps.changes.outputs.changed == 'true'
