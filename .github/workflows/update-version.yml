@@ -14,7 +14,6 @@ on:
         type: choice
         options:
           - linux
-          - darwin
 
 permissions:
   contents: write
@@ -27,7 +26,7 @@ jobs:
       - name: Validate platform
         run: |
           case "${{ inputs.platform }}" in
-            linux|darwin) ;;
+            linux) ;;
             *)
               echo "Unsupported platform: ${{ inputs.platform }}" >&2
               exit 1
