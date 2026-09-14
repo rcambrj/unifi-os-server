@@ -122,7 +122,7 @@ in
 
     package = mkOption {
       type = types.package;
-      default = flake.packages.${pkgs.system}.unifi-os-server;
+      default = flake.packages.${pkgs.stdenv.hostPlatform.system}.unifi-os-server;
       description = "Package containing the extracted UniFi OS Server OCI archive.";
     };
 
