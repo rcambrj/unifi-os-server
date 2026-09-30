@@ -30,6 +30,7 @@ let
     "unifi"
     "mongodb"
     "log"
+    "rabbitmq-ssl"
   ];
 
   mkStateRule = subdir: "d ${cfg.stateDir}/${subdir} 0755 root root -";
@@ -83,6 +84,7 @@ let
     "${cfg.stateDir}/srv:/srv"
     "${cfg.stateDir}/unifi:/var/lib/unifi"
     "${cfg.stateDir}/mongodb:/var/lib/mongodb"
+    "${cfg.stateDir}/rabbitmq-ssl:/etc/rabbitmq/ssl"
     "${fakeNtpService}:/etc/systemd/system/unifi-os-server-fake-ntp.service:ro"
     "${fakeNtpList}:/etc/systemd/ntp-units.d/unifi-os-server-fake-ntp.list:ro"
     "${ucorePreStartFix}:/etc/systemd/system/unifi-core.service.d/prestart-fix.conf:ro"
@@ -99,6 +101,7 @@ let
   ++ optional (cfg.ports.httpCaptivePortal != null) "${toString cfg.ports.httpCaptivePortal}:8880"
   ++ optional (cfg.ports.httpsCaptivePortal != null) "${toString cfg.ports.httpsCaptivePortal}:8843"
   ++ optional (cfg.ports.supportFiles != null) "${toString cfg.ports.supportFiles}:28082"
+  ++ optional (cfg.ports.trafficFlowLogging != null) "${toString cfg.ports.trafficFlowLogging}:5671"
   ++ optional (cfg.ports.stun != null) "${toString cfg.ports.stun}:3478/udp"
   ++ optional (cfg.ports.deviceDiscovery != null) "${toString cfg.ports.deviceDiscovery}:10001/udp"
   ++ cfg.extraPorts;
@@ -110,6 +113,7 @@ let
     cfg.ports.httpCaptivePortal
     cfg.ports.httpsCaptivePortal
     cfg.ports.supportFiles
+    cfg.ports.trafficFlowLogging
   ];
 
   serviceUDPPorts = builtins.filter (port: port != null) [
@@ -193,6 +197,12 @@ in
             type = types.nullOr types.port;
             default = 28082;
             description = "Host port used for UniFi device support-file downloads.";
+          };
+
+          trafficFlowLogging = mkOption {
+            type = types.nullOr types.port;
+            default = 5671;
+            description = "Host port used for UniFi traffic-flow logging.";
           };
 
           stun = mkOption {
