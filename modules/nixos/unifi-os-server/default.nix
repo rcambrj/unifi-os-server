@@ -98,6 +98,7 @@ let
   ++ optional (cfg.ports.mobileSpeedTest != null) "${toString cfg.ports.mobileSpeedTest}:6789"
   ++ optional (cfg.ports.httpCaptivePortal != null) "${toString cfg.ports.httpCaptivePortal}:8880"
   ++ optional (cfg.ports.httpsCaptivePortal != null) "${toString cfg.ports.httpsCaptivePortal}:8843"
+  ++ optional (cfg.ports.supportFiles != null) "${toString cfg.ports.supportFiles}:28082"
   ++ optional (cfg.ports.stun != null) "${toString cfg.ports.stun}:3478/udp"
   ++ optional (cfg.ports.deviceDiscovery != null) "${toString cfg.ports.deviceDiscovery}:10001/udp"
   ++ cfg.extraPorts;
@@ -108,6 +109,7 @@ let
     cfg.ports.mobileSpeedTest
     cfg.ports.httpCaptivePortal
     cfg.ports.httpsCaptivePortal
+    cfg.ports.supportFiles
   ];
 
   serviceUDPPorts = builtins.filter (port: port != null) [
@@ -185,6 +187,12 @@ in
             type = types.nullOr types.port;
             default = 8843;
             description = "Host port used for UniFi HTTPS captive portal traffic.";
+          };
+
+          supportFiles = mkOption {
+            type = types.nullOr types.port;
+            default = 28082;
+            description = "Host port used for UniFi device support-file downloads.";
           };
 
           stun = mkOption {
