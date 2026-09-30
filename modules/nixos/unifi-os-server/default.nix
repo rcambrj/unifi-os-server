@@ -212,6 +212,20 @@ in
       description = "Host ports used for UniFi OS Server service traffic.";
     };
 
+    serviceTCPPorts = mkOption {
+      type = types.listOf types.port;
+      default = serviceTCPPorts;
+      readOnly = true;
+      description = "Computed TCP ports used for UniFi OS Server service traffic, excluding the web UI.";
+    };
+
+    serviceUDPPorts = mkOption {
+      type = types.listOf types.port;
+      default = serviceUDPPorts;
+      readOnly = true;
+      description = "Computed UDP ports used for UniFi OS Server service traffic.";
+    };
+
     extraPorts = mkOption {
       type = types.listOf types.str;
       default = [ ];
